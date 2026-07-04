@@ -169,6 +169,27 @@ Added were a data source and descriptive statistics:
 The Zielvolatilität slider snaps to {5, 10, 15} % because the engine indexes its
 vol-control variants as `VolControl_{int(target_vol*100)}`; this avoids touching the math.
 
+## Deployment (Vercel + Render)
+
+Das Repo enthält **zwei** Anwendungen — deshalb braucht Vercel zwingend das richtige
+Unterverzeichnis, sonst gibt es `404: NOT_FOUND`:
+
+**1. Frontend auf Vercel**
+- Vercel → Projekt → *Settings → Build & Deployment → Root Directory* = **`app`** → Save → Redeploy.
+- *Settings → Environment Variables*:
+  - `ENGINE_URL` = URL der gehosteten Engine (z. B. `https://treasury-volcontrol-engine.onrender.com`)
+  - `OPENAI_API_KEY` = dein Key (für „The Desk")
+
+**2. Engine auf Render** (Compute passt nicht in Vercel-Serverless — siehe Architektur oben)
+- https://dashboard.render.com → *New → Blueprint* → dieses Repo wählen.
+- Die beiliegende [`render.yaml`](render.yaml) richtet den Service automatisch ein
+  (`rootDir: engine`, uvicorn, Health-Check auf `/health`).
+- Free-Tier-Hinweis: Der Dienst schläft bei Inaktivität ein — der erste Request nach einer
+  Pause dauert ~30–60 s (Kaltstart).
+
+Reihenfolge: erst Engine deployen, dann deren URL als `ENGINE_URL` in Vercel eintragen und
+das Frontend redeployen.
+
 ## Swapping in real data
 
 `data.py` reads any CSV/Excel with `date` index and asset-name columns — exactly the
