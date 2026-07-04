@@ -1,0 +1,19 @@
+import { NextRequest, NextResponse } from "next/server";
+import { callEngine, EngineError } from "@/lib/engine";
+import type { EngineParams, HypothesesResponse } from "@/lib/types";
+
+export const runtime = "nodejs";
+
+// The bootstrap is the slowest engine call; give it generous time.
+export const maxDuration = 60;
+
+export async function POST(req: NextRequest) {
+  try {
+    const params = (await req.json()) as EngineParams;
+    const data = await callEngine<HypothesesResponse>("hypotheses", params);
+    return NextResponse.json(data);
+  } catch (e) {
+    const status = e instanceof EngineError ? e.status : 500;
+    return NextResponse.json({ error: (e as Error).message }, { status });
+  }
+}

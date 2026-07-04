@@ -1,0 +1,19 @@
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+engine/.venv/
+
+# Node / Next.js
+app/node_modules/
+app/.next/
+app/out/
+
+# Secrets — the OpenAI key lives only in local .env files
+.env
+.env*.local
+
+# local tooling
+.claude/

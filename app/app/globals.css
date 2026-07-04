@@ -1,0 +1,199 @@
+@import "tailwindcss";
+
+/* ── Design tokens ──────────────────────────────────────────────────────────
+   Institutional research-terminal palette: ink-navy / near-black on paper,
+   a single muted-blue accent, greys for data surfaces, hairline borders.
+   Negative red is used sparingly and stays muted. */
+@theme {
+  /* Goldman-Sachs-inspired: cool near-white, deep navy, one precise blue accent,
+     crisp hairlines, generous negative space. */
+  --color-paper: #ffffff;
+  --color-panel: #f4f6f9;
+  --color-ink: #0b1626;
+  --color-muted: #55606f;
+  --color-faint: #8a94a2;
+  --color-hairline: #e4e8ee;
+  --color-hairline-strong: #c6cdd7;
+  --color-accent: #2b63b3;      /* precise corporate blue */
+  --color-accent-soft: #eaf1fa;
+  --color-neg: #b23b34;
+  --color-pos: #2b63b3;
+
+  /* Deep navy for strong surfaces + HFWU-logo brand colours. */
+  --color-navy: #0a1d3a;
+  --color-gold: #f7b500;        /* HFWU yellow (logo only) */
+  --color-sky: #5b9bd6;         /* light blue — hover / highlight accent */
+  --color-sky-strong: #2b7bc4;  /* stronger blue for lines/borders */
+  --color-sky-soft: #eef5fc;    /* very light blue fill */
+
+  --font-serif: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, "Menlo", "Consolas", monospace;
+}
+
+/* ── Dark mode (GS-style: near-black navy paper, brightened accent) ────────
+   Toggled via html.dark; every token consumer adapts automatically. */
+html.dark {
+  --color-paper: #0d1420;
+  --color-panel: #131c2c;
+  --color-ink: #e8ecf2;
+  --color-muted: #9aa5b4;
+  --color-faint: #6b7684;
+  --color-hairline: #223046;
+  --color-hairline-strong: #33445f;
+  --color-accent: #5f96e0;
+  --color-accent-soft: #16243a;
+  --color-neg: #d76b62;
+  --color-pos: #5f96e0;
+  --color-navy: #dfe6f0;      /* top bar + strong surfaces invert to light */
+  --color-sky: #4f88c8;
+  --color-sky-strong: #5f96e0;
+  --color-sky-soft: #14233a;
+  /* benchmark line colours */
+  --color-bench-gold: #c9a35c;
+  --color-bench-green: #7fae93;
+}
+
+:root {
+  --color-bench-gold: #b08a3e;
+  --color-bench-green: #5a8a6b;
+}
+
+html,
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* All figures in tables are tabular by default. */
+.nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Editorial display headings — clean sans, tight tracking (Goldman-Sans feel). */
+.display {
+  font-family: var(--font-sans);
+  letter-spacing: -0.02em;
+  font-weight: 500;
+}
+
+/* Small uppercase section eyebrows. */
+.eyebrow {
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  font-weight: 600;
+}
+
+/* Native range slider, restyled flat with a hairline track + square thumb. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 2px;
+  background: var(--color-hairline-strong);
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--color-accent);
+  border: none;
+  border-radius: 0;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--color-accent);
+  border: none;
+  border-radius: 0;
+}
+input[type="range"]:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Thin focus ring, no glow. */
+*:focus-visible {
+  outline: 1px solid var(--color-sky-strong);
+  outline-offset: 1px;
+}
+
+/* ── Interaction: minimal, fast, baby-blue ──────────────────────────────────
+   Flat surfaces gain a thin baby-blue hairline and a 2px lift on hover — no
+   heavy shadows, in keeping with the research-terminal restraint. */
+.card-hover {
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.card-hover:hover {
+  border-color: var(--color-sky);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px -12px color-mix(in srgb, var(--color-navy) 55%, transparent);
+}
+
+/* Table rows pick up a faint baby-blue wash on hover. */
+.row-hover {
+  transition: background-color 0.12s ease;
+}
+.row-hover:hover {
+  background: var(--color-sky-soft);
+}
+
+/* The HFWU logo lifts gently on hover. */
+.hfwu-logo {
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
+  transform-origin: left center;
+}
+.hfwu-logo:hover {
+  transform: translateY(-1px) scale(1.02);
+}
+
+/* SVG data points grow smoothly when the chart marks them as active. */
+.spark-dot {
+  transition: r 0.12s ease, opacity 0.12s ease;
+}
+
+/* Skeleton loading placeholder — quiet shimmer instead of bare text. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-panel);
+  border: 1px solid var(--color-hairline);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--color-hairline) 55%, transparent),
+    transparent
+  );
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-sweep {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Correlation cells outline in baby blue on hover. */
+.corr-cell {
+  outline: 1.5px solid transparent;
+  outline-offset: -1.5px;
+  transition: outline-color 0.12s ease;
+}
+.corr-cell:hover {
+  outline-color: var(--color-sky-strong);
+}
