@@ -4,7 +4,13 @@
 import "server-only";
 import type { EngineParams } from "./types";
 
-const ENGINE_URL = (process.env.ENGINE_URL ?? "http://localhost:8000").replace(/\/$/, "");
+// Default engine host: local uvicorn in development, the Render deployment in
+// production. An explicit ENGINE_URL env var overrides both.
+const DEFAULT_ENGINE =
+  process.env.NODE_ENV === "production"
+    ? "https://treasury-volcontrol-engine.onrender.com"
+    : "http://localhost:8000";
+const ENGINE_URL = (process.env.ENGINE_URL ?? DEFAULT_ENGINE).replace(/\/$/, "");
 
 export class EngineError extends Error {
   constructor(message: string, readonly status: number) {
