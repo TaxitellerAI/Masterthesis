@@ -217,7 +217,7 @@ def sweep(req: RunRequest):
 
 @app.post("/hypotheses")
 def hypotheses(req: RunRequest):
-    rets, cfg, _ = _prepared(req, bootstrap_n=2000)   # smaller default for API latency
+    rets, cfg, _ = _prepared(req, bootstrap_n=1200)   # smaller default for API latency (free-tier CPU)
     res = hypothesis_tests(rets, cfg, req.crypto_share, req.target_vol)
     res = {k: (v if k != "sweep" else v.round(5).to_dict(orient="records"))
            for k, v in res.items()}
@@ -290,7 +290,7 @@ def workbook(req: RunRequest):
     weights = portfolio_weights(req.crypto_share, list(rets.columns), cfg)
 
     stats = describe_assets(_prices_raw(req), cfg.rf_annual, cfg.cvar_alpha)
-    hyp_cfg = EngineConfig(**{**cfg.__dict__, "bootstrap_n": 2000})
+    hyp_cfg = EngineConfig(**{**cfg.__dict__, "bootstrap_n": 1200})
     extras = {
         "describe": stats.round(6).to_dict(orient="records"),
         "sweep": crypto_sweep(rets, cfg, req.target_vol).round(6).to_dict(orient="records"),
