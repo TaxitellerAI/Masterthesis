@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { engineHealth } from "@/lib/engine";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 // Proxy the engine's /health probe so the browser can show a live status dot
 // without ever learning the engine URL.

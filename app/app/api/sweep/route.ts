@@ -3,6 +3,7 @@ import { callEngine, EngineError } from "@/lib/engine";
 import type { EngineParams, SweepResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {

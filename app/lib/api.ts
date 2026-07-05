@@ -14,17 +14,41 @@ import type {
   TimeSeriesResponse,
 } from "./types";
 
-async function postJson<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}) as { error?: string });
-    throw new Error(data.error ?? `Anfrage fehlgeschlagen (${res.status}).`);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// The compute engine runs on a free tier that sleeps when idle; the first call
+// after a pause wakes it (a cold start of up to ~1 min). We therefore retry a few
+// times on gateway/timeout errors before giving up, so a cold engine self-heals
+// instead of surfacing a 504 to the user.
+async function postJson<T>(path: string, body: unknown, retries = 3): Promise<T> {
+  let lastErr = "";
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) return (await res.json()) as T;
+      // 502/503/504 → engine waking or gateway timeout → worth retrying
+      if ([502, 503, 504].includes(res.status) && attempt < retries) {
+        lastErr = `Engine wird aufgeweckt… (${res.status})`;
+        await sleep(4000 + attempt * 3000);
+        continue;
+      }
+      const data = await res.json().catch(() => ({}) as { error?: string });
+      throw new Error(data.error ?? `Anfrage fehlgeschlagen (${res.status}).`);
+    } catch (e) {
+      lastErr = (e as Error).message;
+      // network error (fetch reject) → also retry
+      if (attempt < retries && !/fehlgeschlagen \(4/.test(lastErr)) {
+        await sleep(4000 + attempt * 3000);
+        continue;
+      }
+      throw new Error(lastErr);
+    }
   }
-  return (await res.json()) as T;
+  throw new Error(lastErr || "Anfrage fehlgeschlagen.");
 }
 
 export const fetchBacktest = (p: EngineParams) =>

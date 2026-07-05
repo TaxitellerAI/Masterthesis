@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { engineAssets } from "@/lib/engine";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 // Proxy the engine's curated asset universe to the configurator.
 export async function GET() {
