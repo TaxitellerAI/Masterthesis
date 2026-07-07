@@ -12,6 +12,7 @@ import type {
   TimeSeriesResponse,
 } from "@/lib/types";
 import { THESIS } from "@/lib/thesis";
+import { sourceLabel } from "@/lib/format";
 import HfwuLogo from "./HfwuLogo";
 import ThemeToggle from "./ThemeToggle";
 import ControlPanel from "./ControlPanel";
@@ -90,7 +91,7 @@ export default function ResultsView({
           <div className="text-right shrink-0 text-xs text-muted nums">
             <div className="eyebrow">Datensatz</div>
             <div className="mt-1">
-              {describe?.source === "live" ? "Live · Yahoo Finance" : "Synthetisch"} ·{" "}
+              {sourceLabel(describe?.source ?? params.source)} ·{" "}
               {params.base_currency}
             </div>
             <div className="text-faint mt-0.5">

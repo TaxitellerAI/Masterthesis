@@ -114,6 +114,33 @@ def vol_control(port_returns: pd.Series, target_vol: float, lookback: int = 60,
     return strat.dropna(), exposure
 
 
+def rolling_risk_parity(returns: pd.DataFrame, lookback: int = 63,
+                        rebalance: str = "monthly", td: int = 252) -> pd.Series:
+    """Rolling (time-varying) inverse-volatility portfolio — a more realistic
+    risk-parity benchmark than static full-sample weights. Weights are recomputed
+    from trailing volatility and rebalanced on a weekly/monthly grid, shifted one
+    day to avoid look-ahead."""
+    vol = returns.rolling(lookback).std(ddof=1)
+    inv = 1.0 / vol
+    w = inv.div(inv.sum(axis=1), axis=0).shift(1)          # daily target, no look-ahead
+
+    idx = returns.index
+    if rebalance == "weekly":
+        keys = [(d.isocalendar()[0], d.isocalendar()[1]) for d in idx]
+    elif rebalance == "monthly":
+        keys = [(d.year, d.month) for d in idx]
+    else:
+        keys = None
+    if keys is not None:                                    # hold weights within each period
+        grp = pd.DataFrame(w.values, index=pd.MultiIndex.from_tuples(keys), columns=w.columns)
+        held = grp.groupby(level=[0, 1]).transform("first")
+        w = pd.DataFrame(held.values, index=idx, columns=w.columns)
+
+    w = w.fillna(0.0)
+    port = (returns.fillna(0.0) * w).sum(axis=1)
+    return port[w.sum(axis=1) > 0.5]                        # drop the warm-up period
+
+
 def inverse_vol_weights(returns: pd.DataFrame, lookback: int | None = None) -> dict:
     """Risk-parity (inverse-volatility) weights across the available assets.
 

@@ -17,10 +17,11 @@ export default function DataSourcePicker({ source, years, onSource, onYears }: P
   return (
     <div>
       <span className="eyebrow">Datenquelle</span>
-      <div className="grid sm:grid-cols-2 gap-3 mt-3">
+      <div className="grid sm:grid-cols-3 gap-3 mt-3">
         {(
           [
             { id: "synthetic", title: "Synthetisch", desc: "Reproduzierbare Fixture-Daten, sofort verfügbar." },
+            { id: "frozen", title: "Eingefroren · real", desc: "Fixierter Marktdaten-Abzug (EUR), zitierfähig & stabil." },
             { id: "live", title: "Live · Yahoo Finance", desc: "Aktuelle Kurse, bei jedem Lauf neu gezogen." },
           ] as const
         ).map((opt) => {

@@ -24,7 +24,7 @@ class Asset:
 # converts to the requested base currency via EURUSD=X.
 UNIVERSE: tuple[Asset, ...] = (
     Asset("MSCI_World", "URTH", "MSCI World (URTH)", "equity", True),
-    Asset("Global_Bonds", "BND", "Global Bonds (BND)", "bond", True),
+    Asset("Global_Bonds", "BNDX", "Global Bonds (BNDX)", "bond", True),
     Asset("Gold", "GLD", "Gold (GLD)", "commodity", True),
     Asset("Bitcoin", "BTC-USD", "Bitcoin (BTC)", "crypto", True),
     Asset("Ethereum", "ETH-USD", "Ethereum (ETH)", "crypto", True),

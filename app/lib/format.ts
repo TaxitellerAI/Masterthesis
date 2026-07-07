@@ -71,3 +71,10 @@ export function isBenchmark(key: string): boolean {
 export function currencySymbol(c: string): string {
   return c === "USD" ? "$" : "€";
 }
+
+/** Human label for a data source (synthetic | live | frozen). */
+export function sourceLabel(source: string): string {
+  if (source === "live") return "Live · Yahoo Finance";
+  if (source === "frozen") return "Eingefroren · real";
+  return "Synthetisch";
+}

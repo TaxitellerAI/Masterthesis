@@ -16,13 +16,36 @@ interface Props {
 export default function LandingView({ onStart }: Props) {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [down, setDown] = useState(false);
+  const [waking, setWaking] = useState(false);
 
   useEffect(() => {
     let active = true;
-    fetch("/api/health")
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("offline"))))
-      .then((h: HealthResponse) => active && (setHealth(h), setDown(false)))
-      .catch(() => active && setDown(true));
+    // The engine runs on a free tier that spins down when idle; the first probe
+    // can take 30–60 s to cold-start. Retry with backoff and surface a "waking up"
+    // state instead of flashing "offline" so the user knows to wait.
+    const MAX_ATTEMPTS = 6;
+    async function probe(attempt: number): Promise<void> {
+      try {
+        const r = await fetch("/api/health");
+        if (!r.ok) throw new Error("offline");
+        const h: HealthResponse = await r.json();
+        if (active) {
+          setHealth(h);
+          setDown(false);
+          setWaking(false);
+        }
+      } catch {
+        if (!active) return;
+        if (attempt >= MAX_ATTEMPTS) {
+          setWaking(false);
+          setDown(true);
+          return;
+        }
+        setWaking(true);                       // cold-starting, keep trying
+        setTimeout(() => active && probe(attempt + 1), Math.min(2000 * attempt, 8000));
+      }
+    }
+    probe(1);
     return () => {
       active = false;
     };
@@ -100,15 +123,23 @@ export default function LandingView({ onStart }: Props) {
           </button>
           <div className="flex items-center gap-2 text-sm">
             <span
-              className="inline-block w-1.5 h-1.5 rounded-full"
-              style={{ background: down ? "var(--color-neg)" : "var(--color-accent)" }}
+              className={`inline-block w-1.5 h-1.5 rounded-full ${waking ? "animate-pulse" : ""}`}
+              style={{
+                background: down
+                  ? "var(--color-neg)"
+                  : waking
+                    ? "var(--color-warn, #b8843f)"
+                    : "var(--color-accent)",
+              }}
             />
             <span className="text-muted nums">
               {down
                 ? "Engine offline"
-                : health
-                  ? `Engine verbunden · ${health.assets.length} Assets`
-                  : "Engine …"}
+                : waking
+                  ? "Engine startet (Kaltstart) …"
+                  : health
+                    ? `Engine verbunden · ${health.assets.length} Assets`
+                    : "Engine …"}
             </span>
           </div>
         </div>

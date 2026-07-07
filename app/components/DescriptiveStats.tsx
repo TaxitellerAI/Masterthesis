@@ -1,7 +1,7 @@
 "use client";
 
 import type { DescribeResponse } from "@/lib/types";
-import { pct, num, strategyLabel } from "@/lib/format";
+import { pct, num, strategyLabel, sourceLabel } from "@/lib/format";
 import SectionPlaceholder from "./SectionPlaceholder";
 
 interface Props {
@@ -37,7 +37,7 @@ export default function DescriptiveStats({ data, loading }: Props) {
         <h2 className="display text-lg">Deskriptive Statistik</h2>
         {data && (
           <span className="eyebrow">
-            {data.source === "live" ? "Live · Yahoo Finance" : "Synthetisch"} · {data.base_currency}
+            {sourceLabel(data.source)} · {data.base_currency}
           </span>
         )}
       </div>

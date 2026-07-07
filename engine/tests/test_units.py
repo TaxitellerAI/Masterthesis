@@ -13,6 +13,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from volcontrol import metrics as mt
 from volcontrol import stats as sx
+from volcontrol import strategies as strat
+from volcontrol import analysis as an
+from volcontrol import load_prices, simple_returns
+
+_PRICES = os.path.join(os.path.dirname(__file__), "..", "data", "synthetic_prices.csv")
 
 
 def approx(a, b, tol=1e-9):
@@ -96,6 +101,31 @@ def test_deflated_sharpe_runs():
     assert out["n_trials"] == 9
     assert 0.0 <= out["dsr"] <= 1.0
     assert out["sr0"] == out["sr0"]            # not NaN
+
+
+def test_rolling_risk_parity_valid():
+    r = simple_returns(load_prices(_PRICES))
+    prp = strat.rolling_risk_parity(r)
+    assert len(prp) > 100
+    assert not prp.isna().any()                # warm-up dropped, no NaNs leak through
+
+
+def test_drawdown_table_sorted_and_negative():
+    r = simple_returns(load_prices(_PRICES))
+    dt = an.drawdown_table(r)
+    for key in ("buy_hold", "vol_control"):
+        depths = [e["depth"] for e in dt[key]]
+        assert depths == sorted(depths)        # deepest first
+        assert all(d < 0 for d in depths)      # a drawdown is negative
+
+
+def test_rolling_correlation_bounded():
+    r = simple_returns(load_prices(_PRICES))
+    rc = an.rolling_correlation(r)
+    assert rc["series"]                        # at least one crypto vs equity
+    for vals in rc["series"].values():
+        finite = [x for x in vals if x is not None]
+        assert all(-1.0001 <= x <= 1.0001 for x in finite)
 
 
 if __name__ == "__main__":

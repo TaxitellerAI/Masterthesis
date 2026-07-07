@@ -261,6 +261,92 @@ def monthly_returns(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
     return {"years": years, "matrix": matrix, "annual": totals}
 
 
+def _drawdown_episodes(series: pd.Series, top: int = 5) -> list:
+    """Identify the deepest peak-to-trough drawdown episodes of a return series.
+
+    Walks the wealth path, records each completed underwater episode (peak → trough
+    → recovery) with its depth and length, and returns the `top` deepest. The final
+    still-underwater episode is included if the path never recovered.
+    """
+    wealth = (1.0 + series).cumprod()
+    peak = wealth.cummax()
+    dd = wealth / peak - 1.0
+
+    episodes, in_dd = [], False
+    start = trough_date = None
+    trough = 0.0
+    for date, d in dd.items():
+        if not in_dd and d < 0:                    # entering a new drawdown
+            in_dd, start, trough, trough_date = True, date, d, date
+        elif in_dd:
+            if d < trough:
+                trough, trough_date = d, date
+            if d >= 0:                             # recovered → close episode
+                episodes.append((start, trough_date, date, trough))
+                in_dd = False
+    if in_dd:                                       # never recovered
+        episodes.append((start, trough_date, dd.index[-1], trough))
+
+    episodes.sort(key=lambda e: e[3])               # deepest first
+    rows = []
+    for start, tdate, end, depth in episodes[:top]:
+        recovered = dd.loc[end] >= 0
+        rows.append({
+            "start": str(pd.Timestamp(start).date()),
+            "trough": str(pd.Timestamp(tdate).date()),
+            "end": str(pd.Timestamp(end).date()) if recovered else None,
+            "depth": round(float(depth), 5),
+            "length_days": int((pd.Timestamp(end) - pd.Timestamp(start)).days),
+            "recovered": bool(recovered),
+        })
+    return rows
+
+
+def drawdown_table(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
+                   crypto_share: float = 0.10, target_vol: float = 0.10, top: int = 5) -> dict:
+    """Worst drawdown episodes for Buy-and-Hold vs. the selected vol-control —
+    the concrete crisis-by-crisis evidence behind the aggregate max-drawdown."""
+    run = run_strategies(returns, cfg, crypto_share)
+    bh = run["strategies"]["BuyHold"]["returns"]
+    vc = run["strategies"][f"VolControl_{int(target_vol * 100)}"]["returns"]
+    return {
+        "top": top,
+        "buy_hold": _drawdown_episodes(bh, top),
+        "vol_control": _drawdown_episodes(vc, top),
+    }
+
+
+def rolling_correlation(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
+                        window: int = 90) -> dict:
+    """Rolling correlation of each crypto asset with the equity sleeve (MSCI World).
+
+    The diversification premise is that crypto is weakly correlated with equities;
+    this exhibit shows whether that holds through time or breaks down in stress
+    (correlations spiking toward 1 exactly when diversification is needed)."""
+    equity = "MSCI_World"
+    if equity not in returns.columns:
+        return {"window": window, "dates": [], "series": {}, "equity": equity}
+    cryptos = [c for c in cfg.crypto if c in returns.columns]
+    if not cryptos:
+        return {"window": window, "dates": [], "series": {}, "equity": equity}
+
+    eq = returns[equity]
+    cal = returns.index
+    stride = _stride(len(cal))
+    sample = cal[::stride]
+
+    def _c(series):
+        return [None if pd.isna(x) else round(float(x), 4) for x in series.reindex(sample).values]
+
+    series = {c: _c(returns[c].rolling(window).corr(eq)) for c in cryptos}
+    return {
+        "window": window,
+        "equity": equity,
+        "dates": [str(d.date()) for d in sample],
+        "series": series,
+    }
+
+
 def cost_sensitivity(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
                      crypto_share: float = 0.10, target_vol: float = 0.10,
                      multipliers=None) -> dict:

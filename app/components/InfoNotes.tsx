@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { EngineParams, Fingerprint, RfInfo } from "@/lib/types";
 import { BASE_TRAD_WEIGHTS } from "@/lib/types";
+import { sourceLabel } from "@/lib/format";
 
 interface Props {
   fingerprint: Fingerprint | null;
@@ -115,7 +116,7 @@ export default function InfoNotes({
       <div className="mt-3 border border-hairline bg-panel px-4 py-2.5 text-xs text-muted nums flex flex-wrap items-center gap-x-6 gap-y-2">
         <span className="eyebrow">Reproduzierbarkeit</span>
         <span>
-          Datenquelle <span className="text-ink">{source === "live" ? "Live · Yahoo Finance" : "Synthetisch"}</span>
+          Datenquelle <span className="text-ink">{sourceLabel(source)}</span>
         </span>
         <span>
           Basis-Allokation{" "}

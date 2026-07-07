@@ -7,6 +7,7 @@ from .universe import UNIVERSE, ticker_map, universe_payload
 from .analysis import (
     time_series, subperiod_metrics, param_stability, cost_sensitivity,
     walk_forward, rolling_metrics, return_distribution, monthly_returns,
+    drawdown_table, rolling_correlation,
 )
 from .workbook import build_workbook
 from .backtest import (
@@ -45,6 +46,8 @@ __all__ = [
     "rolling_metrics",
     "return_distribution",
     "monthly_returns",
+    "drawdown_table",
+    "rolling_correlation",
     "build_workbook",
     "run_strategies",
     "metrics_table",

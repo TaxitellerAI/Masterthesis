@@ -1,0 +1,24 @@
+name: Keep engine warm
+
+# The engine runs on a free tier that spins down after ~15 min idle, causing a
+# 30–60 s cold start on the next request. This scheduled ping keeps it awake
+# during typical review hours so the examiner never hits a cold start.
+on:
+  schedule:
+    - cron: "*/12 6-20 * * *" # every 12 min, 06:00–20:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        run: |
+          URL="${ENGINE_URL:-https://treasury-volcontrol-engine.onrender.com}/health"
+          echo "Pinging $URL"
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 "$URL" || echo "000")
+          echo "HTTP $code"
+          # Do not fail the workflow on a transient cold-start timeout.
+          if [ "$code" = "200" ]; then echo "Engine warm."; else echo "Non-200 (cold start or deploy); will retry next tick."; fi
+        env:
+          ENGINE_URL: ${{ vars.ENGINE_URL }}

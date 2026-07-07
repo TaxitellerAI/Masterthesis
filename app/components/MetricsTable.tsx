@@ -25,13 +25,20 @@ export default function MetricsTable({ data, loading, selectedTargetVol }: Props
           <thead>
             <tr className="border-b border-hairline-strong text-muted">
               <th className="text-left font-semibold px-4 py-2.5 eyebrow">Strategie</th>
-              <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap">Rendite p.a.</th>
-              <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap">CAGR</th>
-              <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap">Vol</th>
-              <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap">Sharpe</th>
-              <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap">Max DD</th>
-              <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap">CVaR 95 %</th>
-              <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap">Turnover</th>
+              <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap cursor-help"
+                  title="Arithmetische annualisierte Durchschnittsrendite (Mittel der Tagesrenditen × Handelstage).">Rendite p.a.</th>
+              <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap cursor-help"
+                  title="Compound Annual Growth Rate — geometrische, kompoundierte Jahresrendite aus dem Endvermögen.">CAGR</th>
+              <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap cursor-help"
+                  title="Annualisierte Volatilität — Standardabweichung der Tagesrenditen × √Handelstage.">Vol</th>
+              <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap cursor-help"
+                  title="Sharpe Ratio — Überrendite über den risikofreien Zins je Einheit Volatilität (annualisiert).">Sharpe</th>
+              <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap cursor-help"
+                  title="Maximum Drawdown — größter Rückgang vom Höchststand zum darauffolgenden Tief.">Max DD</th>
+              <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap cursor-help"
+                  title="Conditional Value-at-Risk (95 %) — erwarteter Verlust in den schlechtesten 5 % der Tage.">CVaR 95 %</th>
+              <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap cursor-help"
+                  title="Turnover — Summe der absoluten Exposure-Änderungen (Σ|Δ Exposure|); Näherung für die Handelsaktivität.">Turnover</th>
             </tr>
           </thead>
           <tbody>

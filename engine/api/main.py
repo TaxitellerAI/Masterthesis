@@ -24,6 +24,7 @@ from volcontrol import (
     ticker_map, universe_payload,
     time_series, subperiod_metrics, param_stability, cost_sensitivity,
     walk_forward, rolling_metrics, return_distribution, monthly_returns,
+    drawdown_table, rolling_correlation,
     build_workbook,
 )
 from volcontrol.backtest import portfolio_weights, _blended_cost_bps
@@ -33,8 +34,9 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
 
-DATA_PATH = "data/synthetic_prices.csv"   # synthetic fixture for the "synthetic" source
-LIVE_TTL_SECONDS = 900                     # reuse a live pull for 15 min (data is daily)
+DATA_PATH = "data/synthetic_prices.csv"       # synthetic fixture for the "synthetic" source
+FROZEN_PATH = "data/frozen_prices_eur.csv"    # frozen real-market snapshot (EUR), reproducible
+LIVE_TTL_SECONDS = 900                         # reuse a live pull for 15 min (data is daily)
 
 
 class RunRequest(BaseModel):
@@ -44,7 +46,7 @@ class RunRequest(BaseModel):
     rf_annual: float = 0.03
     # --- data selection (additive; defaults reproduce the original behaviour) ---
     assets: Optional[list[str]] = None     # canonical names to include; None = full universe
-    source: str = "synthetic"              # "synthetic" | "live"
+    source: str = "synthetic"              # "synthetic" | "live" | "frozen"
     years: int = 8                          # history length for the live pull
     # --- robustness levers ---
     vol_method: str = "rolling"            # "rolling" | "ewma"
@@ -63,6 +65,13 @@ class RunRequest(BaseModel):
 @lru_cache(maxsize=1)
 def _synthetic_prices() -> pd.DataFrame:
     return load_prices(DATA_PATH)
+
+
+@lru_cache(maxsize=1)
+def _frozen_prices() -> pd.DataFrame:
+    """Frozen real-market EUR snapshot committed to the repo — reproducible, does
+    not drift with live Yahoo Finance, so the reported thesis figures are stable."""
+    return load_prices(FROZEN_PATH)
 
 
 # Live pulls are cached per (years, base_currency) for the full universe, so
@@ -86,11 +95,12 @@ def _live_prices(years: int, base_currency: str) -> pd.DataFrame:
 def _prices_raw(req: RunRequest) -> pd.DataFrame:
     """Native (un-aligned) price matrix for the selected assets and source."""
     try:
-        prices = (
-            _live_prices(req.years, req.base_currency)
-            if req.source == "live"
-            else _synthetic_prices()
-        )
+        if req.source == "live":
+            prices = _live_prices(req.years, req.base_currency)
+        elif req.source == "frozen":
+            prices = _frozen_prices()
+        else:
+            prices = _synthetic_prices()
     except Exception as e:                                  # live fetch / network failure
         raise HTTPException(status_code=502, detail=f"Datenquelle nicht verfügbar: {e}")
 
@@ -111,8 +121,8 @@ def _returns_for(req: RunRequest) -> pd.DataFrame:
     keeps its original NaN-tolerant behaviour so the reference numbers are unchanged.
     """
     prices = _prices_raw(req)
-    if req.source == "live":
-        rets = simple_returns(prices.dropna())   # align prices, then differentiate
+    if req.source in ("live", "frozen"):
+        rets = simple_returns(prices.dropna())   # align real prices, then differentiate
     else:
         rets = simple_returns(prices)
     if rets.empty:
@@ -248,7 +258,7 @@ def dataset(req: RunRequest):
     """Frozen dataset export: the exact aligned price matrix the run used, as CSV,
     with the fingerprint hash in the filename — the citable data snapshot."""
     prices = _prices_raw(req)
-    if req.source == "live":
+    if req.source in ("live", "frozen"):
         prices = prices.dropna()
     rets = _returns_for(req)
     fp = fingerprint(rets)
@@ -269,6 +279,8 @@ def analytics(req: RunRequest):
         "rolling": rolling_metrics(rets, cfg, req.crypto_share, req.target_vol),
         "distribution": return_distribution(rets, cfg, req.crypto_share, req.target_vol),
         "monthly": monthly_returns(rets, cfg, req.crypto_share, req.target_vol),
+        "drawdowns": drawdown_table(rets, cfg, req.crypto_share, req.target_vol),
+        "correlation": rolling_correlation(rets, cfg),
     }
 
 
@@ -278,7 +290,7 @@ def workbook(req: RunRequest):
     formula, so the examiner can reproduce each number by hand."""
     rets, cfg, rf_info = _prepared(req)
     prices = _prices_raw(req)
-    if req.source == "live":
+    if req.source in ("live", "frozen"):
         prices = prices.dropna()                 # aligned prices that rets came from
 
     run = run_strategies(rets, cfg, req.crypto_share)

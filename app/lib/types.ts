@@ -98,6 +98,16 @@ export interface RobustnessResponse {
   walk_forward: WalkForward;
 }
 
+/** One peak-to-trough drawdown episode (engine: analysis.drawdown_table). */
+export interface DrawdownEpisode {
+  start: string;
+  trough: string;
+  end: string | null; // null = never recovered within the sample
+  depth: number; // negative
+  length_days: number;
+  recovered: boolean;
+}
+
 export interface AnalyticsResponse {
   rolling: { window: number; dates: string[]; bh_sharpe: (number | null)[]; vc_sharpe: (number | null)[] };
   distribution: {
@@ -110,6 +120,8 @@ export interface AnalyticsResponse {
     vc_cvar: number;
   };
   monthly: { years: number[]; matrix: (number | null)[][]; annual: number[] };
+  drawdowns: { top: number; buy_hold: DrawdownEpisode[]; vol_control: DrawdownEpisode[] };
+  correlation: { window: number; equity: string; dates: string[]; series: Record<string, (number | null)[]> };
 }
 
 /** One point of the crypto-share sweep (engine: backtest.crypto_sweep). */
@@ -192,7 +204,7 @@ export interface EngineParams {
   rf_annual: number;
   // Data selection (added with the configurator / live data).
   assets: string[]; // canonical names to include
-  source: "synthetic" | "live";
+  source: "synthetic" | "live" | "frozen";
   years: number; // history length for the live Yahoo Finance pull
   // Robustness levers.
   vol_method: "rolling" | "ewma";

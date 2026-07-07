@@ -71,10 +71,12 @@ def run_strategies(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
         p6040 = st.buy_and_hold(returns, {"MSCI_World": 0.6, "Global_Bonds": 0.4})
         out["strategies"]["Benchmark_6040"] = {"returns": p6040, "turnover": 0.0, **_summ(p6040)}
 
-    rpw = st.inverse_vol_weights(returns)
-    if rpw:
-        prp = st.buy_and_hold(returns, rpw)
-        out["strategies"]["Benchmark_RiskParity"] = {"returns": prp, "turnover": 0.0, **_summ(prp)}
+    # Rolling (time-varying) inverse-vol risk parity — more realistic than static
+    # full-sample weights.
+    if returns.shape[1] >= 2 and len(returns) > 80:
+        prp = st.rolling_risk_parity(returns)
+        if len(prp) > 20:
+            out["strategies"]["Benchmark_RiskParity"] = {"returns": prp, "turnover": 0.0, **_summ(prp)}
 
     return out
 
