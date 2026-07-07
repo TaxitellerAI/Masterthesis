@@ -16,11 +16,42 @@ import type {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// The compute engine runs on a free tier that sleeps when idle; the first call
-// after a pause wakes it (a cold start of up to ~1 min). We therefore retry a few
-// times on gateway/timeout errors before giving up, so a cold engine self-heals
-// instead of surfacing a 504 to the user.
-async function postJson<T>(path: string, body: unknown, retries = 3): Promise<T> {
+// Wake the engine BEFORE firing the heavy compute burst. On the free tier the
+// service sleeps after ~15 min idle and needs 30–60 s to boot; hitting it with
+// several heavy POSTs at once means each races its own retry budget against the
+// cold start and some give up first. A single cheap /health probe boots the
+// engine and, once it answers 200, every following compute call lands on a warm
+// instance — the same smooth run you get locally. Polls up to ~2 min, then lets
+// the caller proceed (postJson's own retries remain the final safety net).
+export async function ensureEngineAwake(
+  onWaking?: (waking: boolean) => void,
+  attempts = 24,
+  perProbeTimeoutMs = 9000,
+): Promise<void> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), perProbeTimeoutMs);
+      const res = await fetch("/api/health", { cache: "no-store", signal: ctrl.signal });
+      clearTimeout(t);
+      if (res.ok) {
+        onWaking?.(false);
+        return; // warm
+      }
+    } catch {
+      // network error / abort while the instance is still booting — keep polling
+    }
+    onWaking?.(true); // first miss ⇒ we are cold-starting; surface it to the UI
+    await sleep(2500);
+  }
+  onWaking?.(false); // give up gating; proceed and let per-request retries handle it
+}
+
+// The compute engine runs on a free tier that sleeps when idle; even after the
+// wake probe, a gateway hiccup can surface a 502/503/504. We retry a few times
+// on gateway/timeout/network errors before giving up, so a cold engine self-heals
+// instead of surfacing an error to the user.
+async function postJson<T>(path: string, body: unknown, retries = 4): Promise<T> {
   let lastErr = "";
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {

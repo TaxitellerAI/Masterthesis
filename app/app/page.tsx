@@ -16,6 +16,7 @@ import {
   fetchPdf,
   fetchWorkbook,
   fetchDataset,
+  ensureEngineAwake,
 } from "@/lib/api";
 import { readUrlConfig, syncUrl } from "@/lib/permalink";
 import type {
@@ -66,6 +67,7 @@ export default function Page() {
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
 
   const [configRunning, setConfigRunning] = useState(false);
+  const [waking, setWaking] = useState(false); // engine cold-starting before the first run
   const [loadingFast, setLoadingFast] = useState(false); // backtest+sweep+describe+timeseries
   const [loadingSlow, setLoadingSlow] = useState(false); // robustness
   const [loadingHyp, setLoadingHyp] = useState(false); // bootstrap
@@ -126,6 +128,10 @@ export default function Page() {
     setError(null);
     setConfigRunning(true);
     try {
+      // Boot the engine first (free-tier cold start) so the compute burst below
+      // lands on a warm instance instead of racing the boot and erroring out.
+      await ensureEngineAwake((w) => id === reqId.current && setWaking(w));
+      if (id !== reqId.current) return;
       const [bt, sw, ds, ts] = await Promise.all([
         fetchBacktest(params),
         fetchSweep(params),
@@ -145,7 +151,10 @@ export default function Page() {
     } catch (e) {
       if (id === reqId.current) setError((e as Error).message);
     } finally {
-      if (id === reqId.current) setConfigRunning(false);
+      if (id === reqId.current) {
+        setConfigRunning(false);
+        setWaking(false);
+      }
     }
   }, [params, fetchSlow]);
 
@@ -261,6 +270,7 @@ export default function Page() {
         onBack={() => setStep("landing")}
         onRun={runInitial}
         running={configRunning}
+        waking={waking}
         error={error}
       />
     );

@@ -17,6 +17,7 @@ interface Props {
   onBack: () => void;
   onRun: () => void;
   running: boolean;
+  waking?: boolean; // engine cold-starting (free-tier boot) before the compute burst
   error: string | null;
 }
 
@@ -30,6 +31,7 @@ export default function ConfigureView({
   onBack,
   onRun,
   running,
+  waking = false,
   error,
 }: Props) {
   const canRun = params.assets.length > 0 && !running;
@@ -120,13 +122,21 @@ export default function ConfigureView({
             className="px-7 py-2.5 text-sm border border-ink bg-ink text-paper hover:bg-transparent hover:text-ink transition-colors disabled:opacity-40 disabled:hover:bg-ink disabled:hover:text-paper"
           >
             {running
-              ? params.source === "live"
-                ? "Kurse werden gezogen & berechnet…"
-                : "Wird berechnet…"
+              ? waking
+                ? "Engine startet (Kaltstart)…"
+                : params.source === "live"
+                  ? "Kurse werden gezogen & berechnet…"
+                  : "Wird berechnet…"
               : "Daten laden & berechnen →"}
           </button>
-          {params.source === "live" && (
-            <span className="text-faint text-xs">Live-Abruf kann einige Sekunden dauern.</span>
+          {running && waking ? (
+            <span className="text-faint text-xs">
+              Erststart nach Leerlauf — die Engine fährt hoch (bis ~1 Min), danach läuft alles durch.
+            </span>
+          ) : (
+            params.source === "live" && (
+              <span className="text-faint text-xs">Live-Abruf kann einige Sekunden dauern.</span>
+            )
           )}
         </div>
       </div>
