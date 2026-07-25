@@ -1,6 +1,7 @@
 "use client";
 
-import type { AssetInfo, EngineParams } from "@/lib/types";
+import type { AssetInfo, EngineParams, ScenarioInfo } from "@/lib/types";
+import ScenarioPicker from "./ScenarioPicker";
 import HfwuLogo from "./HfwuLogo";
 import ThemeToggle from "./ThemeToggle";
 import AssetSelector from "./AssetSelector";
@@ -12,6 +13,9 @@ import AllocationControls from "./AllocationControls";
 interface Props {
   catalog: AssetInfo[];
   catalogLoading: boolean;
+  scenarios: ScenarioInfo[];
+  deviatedFrom: string | null;
+  onScenario: (name: string) => void;
   params: EngineParams;
   onChange: (next: Partial<EngineParams>) => void;
   onBack: () => void;
@@ -26,6 +30,9 @@ interface Props {
 export default function ConfigureView({
   catalog,
   catalogLoading,
+  scenarios,
+  deviatedFrom,
+  onScenario,
   params,
   onChange,
   onBack,
@@ -70,6 +77,16 @@ export default function ConfigureView({
                 onChange={(assets) => onChange({ assets })}
               />
             )}
+          </section>
+
+          {/* Sample design — governs window + basket, therefore shown first */}
+          <section className="border border-hairline bg-paper p-6 card-hover">
+            <ScenarioPicker
+              scenarios={scenarios}
+              active={params.scenario}
+              mismatch={params.scenario === "custom" && deviatedFrom !== null}
+              onSelect={onScenario}
+            />
           </section>
 
           {/* Data source */}

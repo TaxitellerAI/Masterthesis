@@ -57,7 +57,7 @@ class RunRequest(BaseModel):
     # Named sample design (volcontrol/sample.py). "custom" keeps the explicit
     # assets/start/end selection; S1..S3 and S4_<year> drive window, crypto members
     # and sleeve mode from the spec instead.
-    scenario: str = "custom"
+    scenario: str = "S1"          # Hauptspezifikation; "custom" = assets/start/end selbst wählen
     # --- robustness levers ---
     vol_method: str = "rolling"            # "rolling" | "ewma"
     rebalance: str = "daily"               # "daily" | "weekly" | "monthly"
@@ -249,6 +249,12 @@ def _cfg(req: RunRequest, **overrides) -> EngineConfig:
 def health():
     r = simple_returns(_synthetic_prices())
     return {"status": "ok", "assets": list(r.columns), "observations": int(len(r))}
+
+
+@app.get("/scenarios")
+def scenarios():
+    """Scenario catalogue for the configurator (single source of truth: sample.py)."""
+    return {"scenarios": sm.scenario_payload()}
 
 
 @app.get("/assets")

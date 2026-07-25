@@ -122,6 +122,29 @@ def start_date_sensitivity(years=(2018, 2019, 2020, 2021, 2022)) -> list[SampleS
     return out
 
 
+def scenario_payload() -> list[dict]:
+    """Serialisable scenario catalogue for the frontend picker.
+
+    The frontend must NOT redefine the specs — it renders this. One source of truth,
+    so a scenario can never mean something different in the UI than in the engine.
+    """
+    out = []
+    for s in list(SCENARIOS.values()) + start_date_sensitivity():
+        out.append({
+            "name": s.name,
+            "label": s.label,
+            "start": s.start,
+            "end": s.end,
+            "sleeve_mode": s.sleeve_mode,
+            "crypto_members": list(s.crypto_members),
+            "expected_assets": list(TRADITIONAL) + list(s.crypto_members),
+            "listing_buffer_days": s.listing_buffer_days,
+            "rationale": s.rationale,
+            "primary": s.name in ("S1", "S2", "S3"),
+        })
+    return out
+
+
 def get_spec(name: Optional[str]) -> SampleSpec:
     """Look up a scenario by name; unknown/None falls back to the main spec."""
     if not name:

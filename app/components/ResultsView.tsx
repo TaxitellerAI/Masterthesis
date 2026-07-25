@@ -8,6 +8,7 @@ import type {
   HypothesesResponse,
   ResultSnapshot,
   RobustnessResponse,
+  ScenarioInfo,
   SweepResponse,
   TimeSeriesResponse,
 } from "@/lib/types";
@@ -28,6 +29,8 @@ import AiExplainer from "./AiExplainer";
 
 interface Props {
   params: EngineParams;
+  scenarios?: ScenarioInfo[];
+  deviatedFrom?: string | null;
   onChange: (next: Partial<EngineParams>) => void;
   backtest: BacktestResponse | null;
   sweep: SweepResponse | null;
@@ -53,6 +56,8 @@ interface Props {
 // Step 3 — the auswertung. Compact masthead + live-tuning sidebar + all exhibits.
 export default function ResultsView({
   params,
+  scenarios = [],
+  deviatedFrom = null,
   onChange,
   backtest,
   sweep,
@@ -76,6 +81,29 @@ export default function ResultsView({
 }: Props) {
   const ready = Boolean(backtest || hypotheses);
 
+  // Everything below comes from the ENGINE's sample report where available, so the
+  // header can never claim a design the backtest did not actually run.
+  const sample = backtest?.sample ?? null;
+  const isCustom = params.scenario === "custom";
+  const spec = scenarios.find((x) => x.name === params.scenario);
+  const scenarioTag = isCustom
+    ? deviatedFrom
+      ? `custom (abweichend von ${deviatedFrom})`
+      : "custom"
+    : `${params.scenario}${spec ? ` · ${spec.label.split(" (")[0]}` : ""}`;
+  // EFFECTIVE window, never the requested one: in custom mode a late-listing coin
+  // (e.g. Solana) silently shortens the intersection, and showing the requested
+  // dates would repeat exactly the mislabelling this header exists to prevent.
+  const fp = backtest?.fingerprint;
+  const sampleWindow = sample
+    ? `${sample.effective_start} – ${sample.effective_end}`
+    : fp?.start && fp?.end
+      ? `${fp.start} – ${fp.end}`
+      : `${params.start} – ${params.end}`;
+  const sleeveLabel =
+    (sample?.sleeve_mode ?? spec?.sleeve_mode) === "point_in_time" ? "PIT-Sleeve" : "fester Korb";
+  const effectiveN = sample?.n_rows ?? fp?.rows ?? null;
+
   return (
     <main className="min-h-screen">
       <header className="border-b border-hairline-strong">
@@ -88,6 +116,19 @@ export default function ResultsView({
             </div>
           </div>
           <div className="flex items-end gap-4 shrink-0">
+          {/* Active sample design — the most consequential setting, therefore in the
+              header. Two PDF reports were once exported against the wrong spec
+              because this was only visible through the API. */}
+          <div className="text-right shrink-0 text-xs nums border-r border-hairline pr-4">
+            <div className="eyebrow">Szenario</div>
+            <div className="mt-1 font-semibold"
+                 style={{ color: isCustom ? "var(--color-neg)" : "var(--color-accent)" }}>
+              {scenarioTag}
+            </div>
+            <div className="text-faint mt-0.5 tabular-nums">
+              {sampleWindow} · {sleeveLabel}
+            </div>
+          </div>
           <div className="text-right shrink-0 text-xs text-muted nums">
             <div className="eyebrow">Datensatz</div>
             <div className="mt-1">
@@ -96,9 +137,7 @@ export default function ResultsView({
             </div>
             <div className="text-faint mt-0.5">
               {params.assets.length} Assets
-              {describe?.window?.observations
-                ? ` · ${describe.window.observations.toLocaleString("de-DE")} Tage`
-                : ""}
+              {effectiveN ? ` · n = ${effectiveN.toLocaleString("de-DE")}` : ""}
             </div>
           </div>
           <ThemeToggle className="mb-0.5" />

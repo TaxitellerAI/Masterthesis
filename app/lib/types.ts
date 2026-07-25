@@ -27,6 +27,11 @@ export interface Fingerprint {
   window_end?: string;
   rf_mode?: string;
   base_currency?: string;
+  scenario?: string;
+  sleeve_mode?: string;
+  effective_start?: string;
+  effective_end?: string;
+  n_rows?: number;
 }
 
 export interface RfInfo {
@@ -53,6 +58,8 @@ export interface RfInfo {
 export interface BacktestResponse {
   crypto_share: number;
   metrics: MetricRow[];
+  sample: SampleReport | null;
+  sleeve: SleeveInfo | null;
   limits: { mdd_limit: number | null; cvar_limit: number | null };
   fingerprint: Fingerprint;
   rf: RfInfo;
@@ -217,6 +224,9 @@ export interface EngineParams {
   // Data selection (added with the configurator / live data).
   assets: string[]; // canonical names to include
   source: "frozen" | "live";
+  // Named sample design (engine: volcontrol/sample.py). "custom" = assets/window
+  // chosen by hand; S1..S3 / S4_<year> are driven by the engine's spec.
+  scenario: string;
   // Explicit calendar window — never a rolling "last N years", so a cited result
   // always refers to the same data set.
   start: string; // YYYY-MM-DD
@@ -233,6 +243,48 @@ export interface EngineParams {
   // Treasury risk limits (negative thresholds; null = off).
   mdd_limit: number | null;
   cvar_limit: number | null;
+}
+
+/** One scenario from the engine catalogue (engine: GET /scenarios). */
+export interface ScenarioInfo {
+  name: string;
+  label: string;
+  start: string;
+  end: string;
+  sleeve_mode: "fixed" | "point_in_time";
+  crypto_members: string[];
+  expected_assets: string[];
+  listing_buffer_days: number;
+  rationale: string;
+  primary: boolean;
+}
+
+/** What a scenario ACTUALLY resolved to (engine: sample.resolve_sample). */
+export interface SampleReport {
+  scenario: string;
+  label: string;
+  sleeve_mode: string;
+  requested_start: string;
+  requested_end: string;
+  effective_start: string;
+  effective_end: string;
+  n_rows: number;
+  n_rows_in_window: number;
+  n_dropped: number;
+  drop_reason: string;
+  assets: string[];
+  crypto_members: string[];
+  listing_buffer_days: number;
+  entry_dates: Record<string, string>;
+  entry_date_basis: string;
+  rationale: string;
+}
+
+export interface SleeveInfo {
+  events: number;
+  total_cost: number;
+  total_turnover: number;
+  dates: string[];
 }
 
 /** Fixed study window — mirrors engine data.STUDY_START / STUDY_END. */
@@ -307,5 +359,7 @@ export interface ResultSnapshot {
   timeseries: TimeSeriesResponse | null;
   robustness: RobustnessResponse | null;
   analytics: AnalyticsResponse | null;
+  /** Named scenario the asset selection deviates from (null = no deviation). */
+  deviatedFrom?: string | null;
   generatedAt: string;
 }

@@ -6,6 +6,7 @@ import ConfigureView from "@/components/ConfigureView";
 import ResultsView from "@/components/ResultsView";
 import {
   fetchAssets,
+  fetchScenarios,
   fetchBacktest,
   fetchSweep,
   fetchHypotheses,
@@ -23,6 +24,7 @@ import { STUDY_START, STUDY_END } from "@/lib/types";
 import type {
   AnalyticsResponse,
   AssetInfo,
+  ScenarioInfo,
   BacktestResponse,
   DescribeResponse,
   EngineParams,
@@ -35,6 +37,9 @@ import type {
 
 type Step = "landing" | "configure" | "results";
 
+const sameSet = (a: string[], b: string[]) =>
+  a.length === b.length && [...a].sort().join("|") === [...b].sort().join("|");
+
 const DEFAULTS: EngineParams = {
   crypto_share: 0.1,
   target_vol: 0.1,
@@ -42,6 +47,7 @@ const DEFAULTS: EngineParams = {
   rf_annual: 0.03,
   assets: [],
   source: "frozen",
+  scenario: "S1",              // Hauptspezifikation der Arbeit
   start: STUDY_START,
   end: STUDY_END,
   vol_method: "rolling",
@@ -59,6 +65,11 @@ export default function Page() {
 
   const [catalog, setCatalog] = useState<AssetInfo[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
+  const [scenarios, setScenarios] = useState<ScenarioInfo[]>([]);
+  // Which named scenario the current asset selection deviates FROM. Keeping this
+  // makes the header able to say "custom (abweichend von S1)" instead of silently
+  // showing a label that no longer describes what is being computed.
+  const [deviatedFrom, setDeviatedFrom] = useState<string | null>(null);
 
   const [backtest, setBacktest] = useState<BacktestResponse | null>(null);
   const [sweep, setSweep] = useState<SweepResponse | null>(null);
@@ -85,6 +96,8 @@ export default function Page() {
     const fromUrl = readUrlConfig();
     if (fromUrl) setParams((p) => ({ ...p, ...fromUrl }));
 
+    fetchScenarios().then(setScenarios).catch(() => setScenarios([]));
+
     fetchAssets()
       .then((cat) => {
         setCatalog(cat);
@@ -97,14 +110,63 @@ export default function Page() {
       .finally(() => setCatalogLoading(false));
   }, []);
 
+  // A named scenario OWNS its basket and window. The asset catalogue's own
+  // defaults (6 assets) do not match S1 (7, incl. BNB), so without this the first
+  // load would label the run "S1" while computing something else.
+  useEffect(() => {
+    if (!scenarios.length) return;
+    setParams((p) => {
+      if (p.scenario === "custom") return p;
+      const spec = scenarios.find((s) => s.name === p.scenario);
+      if (!spec) return p;
+      if (sameSet(p.assets, spec.expected_assets) && p.start === spec.start && p.end === spec.end) {
+        return p;
+      }
+      return { ...p, assets: [...spec.expected_assets], start: spec.start, end: spec.end };
+    });
+  }, [scenarios]);
+
   // Keep the URL in sync so any results view is linkable/reproducible.
   useEffect(() => {
     syncUrl(params, step);
   }, [params, step]);
 
-  const onChange = useCallback((next: Partial<EngineParams>) => {
-    setParams((p) => ({ ...p, ...next }));
-  }, []);
+  const onChange = useCallback(
+    (next: Partial<EngineParams>) => {
+      setParams((p) => {
+        const merged = { ...p, ...next };
+        // Asset selection changed while a named scenario is active? Then the label
+        // would be a lie — demote to "custom" and remember what was deviated from.
+        if (next.assets && merged.scenario !== "custom") {
+          const spec = scenarios.find((s) => s.name === merged.scenario);
+          if (spec && !sameSet(next.assets, spec.expected_assets)) {
+            setDeviatedFrom(merged.scenario);
+            return { ...merged, scenario: "custom" };
+          }
+        }
+        return merged;
+      });
+    },
+    [scenarios],
+  );
+
+  /** Selecting a scenario adopts ITS window and asset basket (engine is authoritative). */
+  const onScenario = useCallback(
+    (name: string) => {
+      setDeviatedFrom(null);
+      if (name === "custom") {
+        setParams((p) => ({ ...p, scenario: "custom" }));
+        return;
+      }
+      const spec = scenarios.find((s) => s.name === name);
+      setParams((p) =>
+        spec
+          ? { ...p, scenario: name, assets: [...spec.expected_assets], start: spec.start, end: spec.end }
+          : { ...p, scenario: name },
+      );
+    },
+    [scenarios],
+  );
 
   // Fetch the slower analyses (hypotheses bootstrap + robustness grid).
   const fetchSlow = useCallback((p: EngineParams, id: number) => {
@@ -208,9 +270,10 @@ export default function Page() {
       timeseries,
       robustness,
       analytics,
+      deviatedFrom,
       generatedAt: new Date().toISOString(),
     }),
-    [params, backtest, sweep, hypotheses, describe, timeseries, robustness, analytics],
+    [params, backtest, sweep, hypotheses, describe, timeseries, robustness, analytics, deviatedFrom],
   );
 
   const download = (blob: Blob, filename: string) => {
@@ -269,6 +332,9 @@ export default function Page() {
         catalogLoading={catalogLoading}
         params={params}
         onChange={onChange}
+        scenarios={scenarios}
+        deviatedFrom={deviatedFrom}
+        onScenario={onScenario}
         onBack={() => setStep("landing")}
         onRun={runInitial}
         running={configRunning}
@@ -281,6 +347,8 @@ export default function Page() {
   return (
     <ResultsView
       params={params}
+      scenarios={scenarios}
+      deviatedFrom={deviatedFrom}
       onChange={onChange}
       backtest={backtest}
       sweep={sweep}

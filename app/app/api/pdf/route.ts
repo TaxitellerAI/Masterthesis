@@ -134,7 +134,48 @@ export async function POST(req: NextRequest) {
   );
   y -= 12;
   hairline(y, INK, 1);
-  y -= 24;
+  y -= 20;
+
+  // ── Sample design, prominently in the HEAD ─────────────────────────────────
+  // Two reports were once exported against a specification the reader could not
+  // see. The active scenario therefore appears here, not only in the
+  // reproducibility block at the end.
+  {
+    const smp = snapshot.backtest?.sample ?? null;
+    const sc = snapshot.params.scenario;
+    const isCustom = sc === "custom";
+    const dev = snapshot.deviatedFrom;
+    const tag = isCustom ? (dev ? `custom (abweichend von ${dev})` : "custom") : sc;
+    const win = smp
+      ? `${smp.effective_start} bis ${smp.effective_end}`
+      : `${snapshot.params.start} bis ${snapshot.params.end}`;
+    const sleeve = smp?.sleeve_mode === "point_in_time" ? "Point-in-Time-Sleeve" : "fester Korb";
+    const nTxt = smp ? `n = ${smp.n_rows.toLocaleString("de-DE")} Handelstage` : "";
+    draw("SAMPLE-DESIGN", { x: M, y, size: 8, font: sansBold, color: MUTED });
+    draw(tag, { x: M + 92, y, size: 9, font: sansBold, color: isCustom ? NEG : ACCENT });
+    y -= 13;
+    text(
+      `${win}   ·   ${sleeve}   ·   ${snapshot.params.assets.length} Assets` +
+        (nTxt ? `   ·   ${nTxt}` : ""),
+      M,
+      sans,
+      8,
+      MUTED,
+    );
+    if (isCustom) {
+      y -= 11;
+      text(
+        "Achtung: freie Konfiguration — entspricht nicht der Hauptspezifikation (S1) der Arbeit.",
+        M,
+        sans,
+        7.5,
+        NEG,
+      );
+    }
+    y -= 14;
+    hairline(y, MUTED, 0.5);
+    y -= 20;
+  }
 
   // ── Parameter block ─────────────────────────────────────────────────────────
   const p = snapshot.params;

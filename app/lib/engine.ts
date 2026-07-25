@@ -56,6 +56,11 @@ export async function engineAssets(): Promise<Response> {
   return fetch(`${ENGINE_URL}/assets`, { cache: "no-store" });
 }
 
+/** GET the scenario catalogue (S1..S4) — the configurator renders these, never redefines them. */
+export async function engineScenarios(): Promise<Response> {
+  return fetch(`${ENGINE_URL}/scenarios`, { cache: "no-store" });
+}
+
 /** POST to an engine endpoint that returns a binary payload (e.g. the .xlsx). */
 export async function callEngineRaw(endpoint: "workbook" | "dataset", params: EngineParams): Promise<Response> {
   try {

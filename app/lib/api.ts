@@ -4,6 +4,7 @@
 import type {
   AnalyticsResponse,
   AssetInfo,
+  ScenarioInfo,
   BacktestResponse,
   DescribeResponse,
   EngineParams,
@@ -102,6 +103,14 @@ export const fetchRobustness = (p: EngineParams) =>
 
 export const fetchAnalytics = (p: EngineParams) =>
   postJson<AnalyticsResponse>("/api/analytics", p);
+
+/** Load the engine's scenario catalogue (single source of truth for sample designs). */
+export async function fetchScenarios(): Promise<ScenarioInfo[]> {
+  const res = await fetch("/api/scenarios");
+  if (!res.ok) throw new Error(`Szenarien konnten nicht geladen werden (${res.status}).`);
+  const data = (await res.json()) as { scenarios: ScenarioInfo[] };
+  return data.scenarios;
+}
 
 /** Load the curated asset universe for the configurator. */
 export async function fetchAssets(): Promise<AssetInfo[]> {
