@@ -19,7 +19,12 @@ class EngineConfig:
     # --- volatility estimator & rebalancing (robustness levers) ---
     vol_method: str = "rolling"                            # "rolling" | "ewma"
     ewma_halflife: int = 20                                # half-life for the EWMA estimator
-    rebalance: str = "daily"                               # "daily" | "weekly" | "monthly"
+    rebalance: str = "daily"                               # EXPOSURE grid of vol-control
+    # Rebalancing grid of the BASE WEIGHTS — a separate decision from the exposure
+    # grid above. Primary specification is monthly: daily constant-mix would charge
+    # the comparison benchmark for behaviour no treasury exhibits. "daily" and the
+    # true-BH drift remain available as edge cases.
+    weight_rebalance: str = "monthly"                      # "daily" | "monthly" | "quarterly"
     dead_band: float = 0.0                                 # exposure no-trade zone (0 = off)
 
     # --- market / cost assumptions ---

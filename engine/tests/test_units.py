@@ -360,6 +360,115 @@ def test_rf_negative_share_comes_from_the_window():
     assert early != late                     # a single constant cannot describe both
 
 
+# ── Sweep bootstrap (H3/TF4 on the data level) ───────────────────────────────
+def _s1_returns():
+    from volcontrol import sample as sm
+    kept, _ = sm.resolve_sample(load_prices(_FROZEN), sm.S1)
+    return simple_returns(kept)
+
+
+def test_sweepboot_matches_engine_sweep():
+    """The vectorised sweep must reproduce the existing engine sweep exactly."""
+    from volcontrol import sweepboot as sb
+    from volcontrol.config import EngineConfig
+    from volcontrol.backtest import crypto_sweep
+    r = _s1_returns()
+    cfg = EngineConfig(rf_mode="constant", rf_annual=0.02, weight_rebalance="daily")
+    ref = crypto_sweep(r, cfg, 0.10)
+    shares = np.asarray(ref["crypto_share"])
+    W = sb._weight_matrix(shares, list(r.columns), cfg)
+    bps = sb._blended_bps(shares, cfg)
+    mine = sb._sweep_once(np.nan_to_num(r.to_numpy(float)), W, bps, cfg, 0.10, cfg.rf_daily)
+    for k in ("d_mdd", "d_cvar", "sharpe_bh", "sharpe_vc"):
+        assert np.abs(mine[k] - ref[k].to_numpy()).max() < 1e-10, k
+
+
+def test_sweepboot_paired_indices_across_shares():
+    """One index sequence per replicate must serve ALL shares (paired design).
+
+    Verified structurally: _sweep_once receives ONE resampled matrix and derives
+    every share from it by matrix product, so per-share divergence is impossible.
+    Empirically, a replicate reproduces exactly when the same indices are reused.
+    """
+    from volcontrol import sweepboot as sb
+    from volcontrol.stats import stationary_bootstrap_indices
+    from volcontrol.config import EngineConfig
+    r = _s1_returns()
+    cfg = EngineConfig(rf_mode="constant")
+    shares = np.array([0.0, 0.1, 0.25, 0.5])
+    W = sb._weight_matrix(shares, list(r.columns), cfg)
+    bps = sb._blended_bps(shares, cfg)
+    R = np.nan_to_num(r.to_numpy(float))
+    idx = stationary_bootstrap_indices(len(R), cfg.expected_block,
+                                       np.random.default_rng(1))
+    a = sb._sweep_once(R[idx], W, bps, cfg, 0.10, 0.0)
+    b = sb._sweep_once(R[idx], W, bps, cfg, 0.10, 0.0)
+    for k in a:
+        assert np.allclose(a[k], b[k], equal_nan=True)
+    # all four shares come from the SAME resampled rows -> one matmul
+    assert (R[idx] @ W).shape == (len(R), len(shares))
+
+
+def test_sweepboot_preserves_cross_correlation():
+    """Resampling ROWS keeps the cross-sectional correlation — the economic core."""
+    from volcontrol.stats import stationary_bootstrap_indices
+    r = _s1_returns()
+    R = np.nan_to_num(r.to_numpy(float))
+    c0 = np.corrcoef(R, rowvar=False)
+    rng = np.random.default_rng(7)
+    diffs = []
+    for _ in range(20):
+        idx = stationary_bootstrap_indices(len(R), 20, rng)
+        diffs.append(np.abs(np.corrcoef(R[idx], rowvar=False) - c0).max())
+    assert np.median(diffs) < 0.15      # correlation structure survives resampling
+
+
+def test_sweepboot_reproducible_and_band_contains_point():
+    """Fixed seed -> identical result; the band must bracket the point estimate."""
+    from volcontrol import sweepboot as sb
+    from volcontrol.config import EngineConfig
+    r = _s1_returns()
+    cfg = EngineConfig(rf_mode="constant")
+    a = sb.sweep_bootstrap(r, cfg, 0.10, n_boot=60, seed=123)
+    b = sb.sweep_bootstrap(r, cfg, 0.10, n_boot=60, seed=123)
+    assert a["slopes"]["d_mdd"] == b["slopes"]["d_mdd"]
+    assert a["argmax"]["distribution"] == b["argmax"]["distribution"]
+    for k, band in a["bands"].items():
+        for lo, pt, hi in zip(band["simultaneous_low"], band["point"],
+                              band["simultaneous_high"]):
+            if None in (lo, pt, hi):
+                continue
+            assert lo <= pt <= hi, k
+
+
+def test_periodic_mix_daily_equals_buy_and_hold():
+    """The old daily specification must remain exactly reproducible."""
+    from volcontrol import strategies as stt
+    r = _s1_returns()
+    w = {"MSCI_World": 0.54, "Global_Bonds": 0.27, "Gold": 0.09,
+         "Bitcoin": 0.025, "Ethereum": 0.025, "XRP": 0.025, "BNB": 0.025}
+    port, wp = stt.periodic_mix(r, w, "daily")
+    assert np.allclose(port.values, stt.buy_and_hold(r, w).values)
+    for freq in ("monthly", "quarterly"):
+        p2, w2 = stt.periodic_mix(r, w, freq)
+        assert float((w2.sum(axis=1) - 1.0).abs().max()) < 1e-9
+        assert float(stt.weights_turnover(w2).sum()) > 0.0
+
+
+def test_grid_matches_metrics_table():
+    """Parameter-stability grid and metrics table must agree for the same config."""
+    from volcontrol.config import EngineConfig
+    from volcontrol import analysis as ana
+    from volcontrol.backtest import run_strategies, metrics_table
+    r = _s1_returns()
+    cfg = EngineConfig(rf_mode="constant")
+    t = metrics_table(run_strategies(r, cfg, 0.10))
+    g = ana.param_stability(r, cfg, 0.10)
+    i = g["lookbacks"].index(cfg.lookback)
+    j = g["target_vols"].index(0.10)
+    assert abs(g["sharpe"][i][j] - float(t.loc["VolControl_10", "sharpe"])) < 6e-4
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

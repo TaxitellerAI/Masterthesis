@@ -241,7 +241,12 @@ def resolve_sample(prices: pd.DataFrame, spec: SampleSpec,
         "requested_end": spec.end,
         "effective_start": str(kept.index.min().date()),
         "effective_end": str(kept.index.max().date()),
-        "n_rows": int(len(kept)),
+        # Two different counts exist and BOTH are legitimate — they must never be
+        # confused in the thesis: price rows vs. the return days derived from them
+        # (the first price row yields no return).
+        "n_price_rows": int(len(kept)),
+        "n_return_days": int(max(len(kept) - 1, 0)),
+        "n_rows": int(len(kept)),          # legacy alias = n_price_rows
         "n_rows_in_window": int(n_window),
         "n_dropped": int(n_window - len(kept)),
         "drop_reason": reason,

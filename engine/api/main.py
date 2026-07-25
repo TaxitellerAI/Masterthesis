@@ -30,6 +30,7 @@ from volcontrol import (
 )
 from volcontrol.backtest import portfolio_weights, _blended_cost_bps
 from volcontrol import sample as sm
+from volcontrol import sweepboot as sm_sweepboot
 
 app = FastAPI(title="Volatility-Control Treasury Engine", version="0.2.0")
 app.add_middleware(
@@ -39,7 +40,8 @@ app.add_middleware(
 DATA_PATH = "data/synthetic_prices.csv"       # internal fixture (tests + /health only)
 FROZEN_PATH = "data/frozen_prices_eur.csv"    # frozen real-market snapshot (EUR), reproducible
 FROZEN_RF_PATH = "data/frozen_rf_eur.csv"     # frozen chained €STR/EONIA series
-LIVE_TTL_SECONDS = 900                         # reuse a live pull for 15 min (data is daily)
+LIVE_TTL_SECONDS = 900         # reuse a live pull for 15 min (data is daily)
+SWEEP_BOOT_N = 1000           # data-level H3/TF4 replicates; ~7 s. Do NOT reduce.
 
 
 class RunRequest(BaseModel):
@@ -347,10 +349,35 @@ def sweep(req: RunRequest):
     return {"target_vol": req.target_vol, "points": df.round(5).to_dict(orient="records")}
 
 
+_sweepboot_cache: dict[tuple, dict] = {}
+
+
+@app.post("/sweepbootstrap")
+def sweepbootstrap(req: RunRequest):
+    """H3/TF4 inference on the DATA level — bootstraps the whole sweep.
+
+    Cached per (scenario, share grid, target vol, rf mode, B): B = 1000 costs ~8 s,
+    which is fine once but not on every slider nudge.
+    """
+    rets, cfg, _, spec, sample_report, pit = _prepared(req)
+    key = (req.scenario, req.source, req.start, req.end, req.target_vol,
+           _rf_mode(req), req.base_currency, SWEEP_BOOT_N)
+    hit = _sweepboot_cache.get(key)
+    if hit is None:
+        t0 = time.time()
+        hit = sm_sweepboot.sweep_bootstrap(rets, cfg, req.target_vol,
+                                           n_boot=SWEEP_BOOT_N, seed=cfg.seed)
+        hit["runtime_seconds"] = round(time.time() - t0, 2)
+        hit["sample"] = sample_report
+        _sweepboot_cache[key] = hit
+    return hit
+
+
 @app.post("/hypotheses")
 def hypotheses(req: RunRequest):
     rets, cfg, _, spec, sample_report, pit = _prepared(req, bootstrap_n=1200)   # smaller default for API latency (free-tier CPU)
-    res = hypothesis_tests(rets, cfg, req.crypto_share, req.target_vol, pit_builder=pit)
+    res = hypothesis_tests(rets, cfg, req.crypto_share, req.target_vol,
+                           pit_builder=pit, n_sweep_boot=SWEEP_BOOT_N)
     res = {k: (v if k != "sweep" else v.round(5).to_dict(orient="records"))
            for k, v in res.items()}
     return res
@@ -505,6 +532,9 @@ def describe(req: RunRequest):
             "end": str(aligned.index.max().date()),
             "observations": int(len(aligned)),
             "partial_years": partial_years,
+            "sample_years": [int(y0), int(y1)],
+            "n_price_rows": (report or {}).get("n_price_rows"),
+            "n_return_days": int(len(aligned)),
             "note": ("Primärblock = aktives Sample-Fenster (identisch zum Backtest). "
                      "'assets_full' beschreibt die vollständige verfügbare Historie je Asset "
                      "und ist NICHT die Datenbasis der Ergebnisse."),

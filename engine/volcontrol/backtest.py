@@ -60,11 +60,12 @@ def run_strategies(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
     sleeve_info = None
     if pit_builder is None:
         weights = portfolio_weights(crypto_share, available, cfg)
-        port_gross = st.buy_and_hold(returns, weights)
-        # Constant-mix means trading back to target every day. That is real turnover
-        # and it is charged, so the base portfolio and vol-control face the SAME
-        # underlying cost assumption (vol-control then pays its exposure cost on top).
-        bh_turn, bh_cost = weight_cost(st.constant_mix_weight_path(returns, weights), cfg)
+        # The base weights are rebalanced on cfg.weight_rebalance (monthly by default).
+        # CRITICAL: vol_control below scales THIS series, so the vol-control strategy
+        # and the Buy-and-Hold benchmark rest on the identical base portfolio — the
+        # two are never different grundportfolios.
+        port_gross, wpath = st.periodic_mix(returns, weights, cfg.weight_rebalance)
+        bh_turn, bh_cost = weight_cost(wpath, cfg)
         port = port_gross - bh_cost
     else:
         W, sleeve_cost, sleeve_info = pit_builder(crypto_share, returns.index)
@@ -124,8 +125,8 @@ def run_strategies(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
 
     if "MSCI_World" in available and "Global_Bonds" in available:
         w6040 = {"MSCI_World": 0.6, "Global_Bonds": 0.4}
-        g6040 = st.buy_and_hold(returns, w6040)
-        t6040, c6040 = weight_cost(st.constant_mix_weight_path(returns, w6040), cfg)
+        g6040, wp6040 = st.periodic_mix(returns, w6040, cfg.weight_rebalance)
+        t6040, c6040 = weight_cost(wp6040, cfg)
         n6040 = g6040 - c6040
         out["strategies"]["Benchmark_6040"] = {
             "returns": n6040, **_summ(n6040, gross=g6040, turnover=t6040.sum())}
@@ -179,7 +180,7 @@ def crypto_sweep(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
     for s in shares:
         if pit_builder is None:
             weights = portfolio_weights(float(s), list(returns.columns), cfg)
-            port = st.buy_and_hold(returns, weights)
+            port, _wp = st.periodic_mix(returns, weights, cfg.weight_rebalance)
         else:
             W, sleeve_cost, _ = pit_builder(float(s), returns.index)
             port = sm.weighted_portfolio(returns, W) - sleeve_cost
@@ -252,7 +253,7 @@ def dsr_trial_returns(returns: pd.DataFrame, cfg: EngineConfig, crypto_share: fl
 
 def hypothesis_tests(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
                      crypto_share: float = 0.10, target_vol: float = 0.10,
-                     pit_builder=None) -> dict:
+                     pit_builder=None, n_sweep_boot: int = 0) -> dict:
     """H1 (MDD), H2 (Sharpe) via paired bootstrap; H3 (interaction) via HAC slope."""
     run = run_strategies(returns, cfg, crypto_share, pit_builder)
     bh = run["strategies"]["BuyHold"]["returns"].values
@@ -298,14 +299,37 @@ def hypothesis_tests(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
     # regard to which side of alpha the p-values fall on. Both variants are reported
     # (holm_adjusted vs. holm_adjusted_incl_wilcoxon) so the effect of the choice is
     # documented rather than hidden.
+    # H3 on the DATA level (bootstrap of the whole sweep). The 21 sweep points are
+    # not 21 observations but deterministic transforms of one price history, so the
+    # HAC-OLS slope over the share axis is near-tautological. When available, the
+    # data-level slope is the CONFIRMATORY test for H3 and the HAC/Mann-Kendall
+    # results move to a clearly marked supplementary block.
+    sboot = None
+    if n_sweep_boot > 0:
+        from . import sweepboot as sbm
+        sboot = sbm.sweep_bootstrap(returns, cfg, target_vol, n_boot=n_sweep_boot,
+                                    shares=shares)
+
     confirmatory = {
         "H1_max_drawdown": h1["p_value"],
         "H2_sharpe": h2["p_value"],
-        "H3_dMDD_vs_share": h3_mdd["p_value"],
-        "H3_dCVaR_vs_share": h3_cvar["p_value"],
     }
+    if sboot is not None:
+        confirmatory["H3_dMDD_slope_data"] = sboot["slopes"]["d_mdd"]["p_value"]
+        confirmatory["H3_dCVaR_slope_data"] = sboot["slopes"]["d_cvar"]["p_value"]
+        h3_family_basis = "data_level_sweep_bootstrap"
+    else:
+        confirmatory["H3_dMDD_vs_share"] = h3_mdd["p_value"]
+        confirmatory["H3_dCVaR_vs_share"] = h3_cvar["p_value"]
+        h3_family_basis = "sweep_level_hac_ols"
+
     holm = stx.holm_correction(confirmatory)
     holm_with_wilcox = stx.holm_correction({**confirmatory, "wilcoxon_daily": wilcox["p_value"]})
+    # Both H3 variants side by side, so the difference is documentable in the thesis.
+    holm_sweep_level = stx.holm_correction({
+        "H1_max_drawdown": h1["p_value"], "H2_sharpe": h2["p_value"],
+        "H3_dMDD_vs_share": h3_mdd["p_value"], "H3_dCVaR_vs_share": h3_cvar["p_value"],
+    })
 
     # Deflated Sharpe against the configurations the study REALLY explored
     # (stability grid + sweep), not just the rows of the metrics table.
@@ -325,7 +349,16 @@ def hypothesis_tests(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
         "H3_dCVaR_boot_slope": h3_cvar_boot,
         "holm_adjusted": holm,
         "holm_adjusted_incl_wilcoxon": holm_with_wilcox,
+        "holm_adjusted_sweep_level_h3": holm_sweep_level,
         "holm_family": list(confirmatory.keys()),
+        "h3_family_basis": h3_family_basis,
+        "sweep_bootstrap": sboot,
+        "sweep_level_note": ("Mann-Kendall und HAC-OLS laufen über die 21 Sweep-Punkte. "
+                             "Diese sind KEINE 21 Beobachtungen, sondern deterministische "
+                             "Transformationen derselben Preisreihe — ein Monotonietest muss "
+                             "auf einer glatten Kurve anschlagen (τ = 1,00). Sie werden daher "
+                             "nur ergänzend berichtet; konfirmatorisch ist die Steigung auf "
+                             "Datenebene."),
         "holm_note": ("Konfirmatorische Familie = vorab spezifizierte Hypothesen H1, H2 und die "
                       "beiden H3-Steigungen. Der Wilcoxon-Test auf Tagesrenditen beantwortet keine "
                       "davon und wird deskriptiv AUSSERHALB der Holm-Korrektur berichtet."),

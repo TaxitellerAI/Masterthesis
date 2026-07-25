@@ -3,6 +3,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import type { ResultSnapshot } from "@/lib/types";
 import { strategyLabel } from "@/lib/format";
 import { THESIS } from "@/lib/thesis";
+import { sourceLabel } from "@/lib/format";
 
 export const runtime = "nodejs";
 
@@ -150,7 +151,13 @@ export async function POST(req: NextRequest) {
       ? `${smp.effective_start} bis ${smp.effective_end}`
       : `${snapshot.params.start} bis ${snapshot.params.end}`;
     const sleeve = smp?.sleeve_mode === "point_in_time" ? "Point-in-Time-Sleeve" : "fester Korb";
-    const nTxt = smp ? `n = ${smp.n_rows.toLocaleString("de-DE")} Handelstage` : "";
+    // Price rows and return days differ by one (the first price row yields no
+    // return). Both are legitimate; labelling them identically is what made the
+    // header and the metrics table appear to contradict each other.
+    const nTxt = smp
+      ? `n = ${(smp.n_price_rows ?? smp.n_rows).toLocaleString("de-DE")} Kurszeilen` +
+        ` / ${(smp.n_return_days ?? smp.n_rows - 1).toLocaleString("de-DE")} Renditetage`
+      : "";
     draw("SAMPLE-DESIGN", { x: M, y, size: 8, font: sansBold, color: MUTED });
     draw(tag, { x: M + 92, y, size: 9, font: sansBold, color: isCustom ? NEG : ACCENT });
     y -= 13;
@@ -201,7 +208,7 @@ export async function POST(req: NextRequest) {
   if (snapshot.describe) {
     const d = snapshot.describe;
     text(
-      `Datensatz: ${d.source === "live" ? "Live · Yahoo Finance" : "Synthetisch"} · ${d.base_currency} · ` +
+      `Datensatz: ${sourceLabel(d.source)} · ${d.base_currency} · ` +
         `Fenster ${d.window.start ?? "?"}–${d.window.end ?? "?"} · ${d.window.observations} Beobachtungen`,
       M,
       sans,
@@ -317,24 +324,54 @@ export async function POST(req: NextRequest) {
       y -= 16;
     };
 
-    const H = h.holm_adjusted;
+    const H = h.holm_adjusted ?? {};
+    // H3 is confirmed on the DATA level when the sweep bootstrap ran; the HAC slope
+    // over the share axis is only supplementary. Fall back to the old keys so an
+    // older snapshot still renders instead of crashing the export.
+    const sb = h.sweep_bootstrap ?? null;
+    const dataLevel = Boolean(sb) && H["H3_dMDD_slope_data"] !== undefined;
     row("H1", "Max Drawdown · VC vs. BH", sgnPct(h.H1_max_drawdown.observed_diff),
-      h.H1_max_drawdown.p_value, H["H1_max_drawdown"]);
+      h.H1_max_drawdown.p_value, H["H1_max_drawdown"] ?? h.H1_max_drawdown.p_value);
     row("H2", "Sharpe-Differenz · VC vs. BH", fx(h.H2_sharpe.observed_diff),
-      h.H2_sharpe.p_value, H["H2_sharpe"]);
-    row("H3", "dMDD ~ Krypto-Quote (Steigung)", fx(h.H3_dMDD_vs_share.slope),
-      h.H3_dMDD_vs_share.p_value, H["H3_dMDD_vs_share"]);
-    row("H3", "dCVaR ~ Krypto-Quote (Steigung)", fx(h.H3_dCVaR_vs_share.slope, 4),
-      h.H3_dCVaR_vs_share.p_value, H["H3_dCVaR_vs_share"]);
+      h.H2_sharpe.p_value, H["H2_sharpe"] ?? h.H2_sharpe.p_value);
+    if (dataLevel && sb) {
+      row("H3", "dMDD ~ Quote · Steigung (Datenebene)", fx(sb.slopes.d_mdd.slope),
+        sb.slopes.d_mdd.p_value, H["H3_dMDD_slope_data"]);
+      row("H3", "dCVaR ~ Quote · Steigung (Datenebene)", fx(sb.slopes.d_cvar.slope, 4),
+        sb.slopes.d_cvar.p_value, H["H3_dCVaR_slope_data"]);
+    } else {
+      row("H3", "dMDD ~ Krypto-Quote (HAC, Sweep-Ebene)", fx(h.H3_dMDD_vs_share.slope),
+        h.H3_dMDD_vs_share.p_value, H["H3_dMDD_vs_share"] ?? h.H3_dMDD_vs_share.p_value);
+      row("H3", "dCVaR ~ Krypto-Quote (HAC, Sweep-Ebene)", fx(h.H3_dCVaR_vs_share.slope, 4),
+        h.H3_dCVaR_vs_share.p_value, H["H3_dCVaR_vs_share"] ?? h.H3_dCVaR_vs_share.p_value);
+    }
 
     y -= 2;
     draw(
       `Deflated Sharpe ${fx(h.deflated_sharpe.dsr, 3)} (nach ${h.deflated_sharpe.n_trials} Konfig.) · ` +
-        `Probabilistic Sharpe ${fx(h.probabilistic_sharpe.psr, 3)} · ` +
-        `H3 Mann-Kendall t=${fx(h.H3_dMDD_mann_kendall.tau, 2)}`,
+        `Probabilistic Sharpe ${fx(h.probabilistic_sharpe.psr, 3)}` +
+        (dataLevel ? ` · H3 konfirmatorisch auf Datenebene (B = ${sb!.n_boot})` : ""),
       { x: M, y, size: 8, font: sans, color: MUTED },
     );
-    y -= 20;
+    y -= 14;
+
+    // TF4 — the range the data cannot separate. This is the headline answer and
+    // belongs in the report, not only in the UI.
+    if (sb?.argmax?.indistinguishable_range) {
+      ensure(30);
+      const r0 = sb.argmax.indistinguishable_range[0] * 100;
+      const r1 = sb.argmax.indistinguishable_range[1] * 100;
+      draw("TF4", { x: M, y, size: 11, font: serifBold, color: INK });
+      draw(
+        `Optimale Krypto-Quote: Punktschätzung ${(sb.argmax.best_share_point * 100).toFixed(1)} %; ` +
+          `statistisch NICHT unterscheidbar ${r0.toFixed(1)} %–${r1.toFixed(1)} % ` +
+          `(${sb.argmax.indistinguishable_shares.length}/${sb.shares.length} Quoten, Kriterium ${sb.criterion})`,
+        { x: M + 34, y, size: 8, font: sans, color: MUTED },
+      );
+      y -= 20;
+    } else {
+      y -= 6;
+    }
   }
 
   // ── Regime analysis ─────────────────────────────────────────────────────────
@@ -382,7 +419,7 @@ export async function POST(req: NextRequest) {
   const footY = M;
   page.drawLine({ start: { x: M, y: footY + 22 }, end: { x: PAGE.w - M, y: footY + 22 }, thickness: 0.75, color: HAIR });
   draw(
-    `Erzeugt ${new Date(snapshot.generatedAt).toLocaleString("de-DE")} · Zahlen aus der volcontrol-Engine (synthetische Daten, sofern nicht anders konfiguriert).`,
+    `Erzeugt ${new Date(snapshot.generatedAt).toLocaleString("de-DE")} · Alle Zahlen aus der volcontrol-Engine; Datenquelle und Sample-Design stehen im Kopfbereich.`,
     { x: M, y: footY + 10, size: 7.5, font: sans, color: MUTED },
   );
   const fp = snapshot.backtest?.fingerprint;

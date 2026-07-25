@@ -113,7 +113,9 @@ export default function HypothesesPanel({ data, loading }: Props) {
             <div className="px-4 py-2.5 border-b border-hairline flex items-baseline gap-3">
               <span className="display text-base text-accent">H3</span>
               <span className="text-sm font-medium">Effekt steigt mit der Krypto-Quote</span>
-              <span className="text-faint text-xs">— drei unabhängige Inferenzwege</span>
+              <span className="text-faint text-xs">
+                — konfirmatorisch: Steigung auf <strong>Datenebene</strong>
+              </span>
             </div>
             {[
               {
@@ -121,14 +123,18 @@ export default function HypothesesPanel({ data, loading }: Props) {
                 hac: data.H3_dMDD_vs_share,
                 mk: data.H3_dMDD_mann_kendall,
                 boot: data.H3_dMDD_boot_slope,
-                holmP: data.holm_adjusted["H3_dMDD_vs_share"],
+                holmP: data.holm_adjusted["H3_dMDD_slope_data"] ??
+                  data.holm_adjusted["H3_dMDD_vs_share"],
+                boot2: data.sweep_bootstrap?.slopes?.d_mdd ?? null,
               },
               {
                 label: "ΔCVaR ~ Quote",
                 hac: data.H3_dCVaR_vs_share,
                 mk: data.H3_dCVaR_mann_kendall,
                 boot: data.H3_dCVaR_boot_slope,
-                holmP: data.holm_adjusted["H3_dCVaR_vs_share"],
+                holmP: data.holm_adjusted["H3_dCVaR_slope_data"] ??
+                  data.holm_adjusted["H3_dCVaR_vs_share"],
+                boot2: data.sweep_bootstrap?.slopes?.d_cvar ?? null,
               },
             ].map((r) => (
               <div key={r.label} className="px-4 py-3 border-b border-hairline last:border-0 row-hover">
@@ -136,7 +142,22 @@ export default function HypothesesPanel({ data, loading }: Props) {
                   <span className="text-sm font-medium">{r.label}</span>
                   <Tag p={r.holmP} />
                 </div>
-                <div className="grid sm:grid-cols-3 gap-x-6 gap-y-1 mt-2 text-xs nums">
+                {r.boot2 && (
+                  <div className="mt-2 text-xs nums border-l-2 border-accent pl-3">
+                    <span className="text-faint">Steigung (Datenebene, Sweep-Bootstrap)</span>{" "}
+                    <span className="tabular-nums font-semibold">{num(r.boot2.slope, 3)}</span>{" "}
+                    <span className="text-faint">
+                      95%-KI [{num(r.boot2.ci_low, 3)}, {num(r.boot2.ci_high, 3)}], p{" "}
+                      {pval(r.boot2.p_value)} · {(r.boot2.share_positive * 100).toFixed(0)} % der
+                      Replikate positiv
+                    </span>
+                  </div>
+                )}
+                <div className="mt-2 text-xs text-faint">
+                  Ergänzend, Sweep-Ebene (eingeschränkt aussagekräftig — die 21 Punkte sind
+                  deterministische Transformationen derselben Preisreihe):
+                </div>
+                <div className="grid sm:grid-cols-3 gap-x-6 gap-y-1 mt-1 text-xs nums opacity-70">
                   <div>
                     <span className="text-faint">HAC-OLS Steigung</span>{" "}
                     <span className="tabular-nums">{num(r.hac.slope, 3)}</span>{" "}
@@ -157,6 +178,53 @@ export default function HypothesesPanel({ data, loading }: Props) {
               </div>
             ))}
           </div>
+
+          {/* TF4 — the honest answer: a RANGE the data cannot separate, not a point */}
+          {data.sweep_bootstrap && (
+            <div className="border border-hairline bg-paper card-hover">
+              <div className="px-4 py-2.5 border-b border-hairline flex items-baseline gap-3 flex-wrap">
+                <span className="display text-base text-accent">TF4</span>
+                <span className="text-sm font-medium">Optimale Krypto-Quote</span>
+                <span className="text-faint text-xs">
+                  — Sweep-Bootstrap auf Datenebene, B ={" "}
+                  {data.sweep_bootstrap.n_boot.toLocaleString("de-DE")}
+                </span>
+              </div>
+              <div className="px-4 py-3 space-y-2">
+                {(() => {
+                  const a = data.sweep_bootstrap!.argmax;
+                  const rng = a.indistinguishable_range;
+                  return (
+                    <>
+                      <div className="text-sm">
+                        Punktschätzung beste Quote:{" "}
+                        <span className="nums tabular-nums font-semibold">
+                          {(a.best_share_point * 100).toFixed(1)} %
+                        </span>
+                      </div>
+                      <div className="border-l-2 border-accent pl-3 text-sm">
+                        Statistisch <strong>nicht unterscheidbar</strong> vom Optimum:{" "}
+                        <span className="nums tabular-nums font-semibold text-accent">
+                          {rng ? `${(rng[0] * 100).toFixed(1)} % – ${(rng[1] * 100).toFixed(1)} %` : "—"}
+                        </span>{" "}
+                        <span className="text-faint">
+                          ({a.indistinguishable_shares.length} von{" "}
+                          {data.sweep_bootstrap!.shares.length} Quoten)
+                        </span>
+                      </div>
+                      <p className="text-faint text-xs leading-snug">
+                        Der Argmax ist ein <em>nicht-reguläres</em> Funktional — ein naives
+                        Bootstrap-Intervall dafür ist unzuverlässig. Belastbar ist der Bereich
+                        oben: alle Quoten, deren Konfidenzintervall für die Differenz zum
+                        Optimum die Null enthält. Auswahlkriterium vorab festgelegt:{" "}
+                        <strong>{data.sweep_bootstrap!.criterion}</strong>.
+                      </p>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
 
           {/* Wilcoxon — DESCRIPTIVE companion, deliberately outside the Holm family */}
           <div className="border border-hairline bg-paper px-4 py-2.5 flex items-center justify-between text-xs text-muted nums">

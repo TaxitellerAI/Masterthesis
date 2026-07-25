@@ -15,13 +15,23 @@ from .backtest import run_strategies, portfolio_weights, _blended_cost_bps
 
 def _base_port(returns: pd.DataFrame, cfg: EngineConfig, crypto_share: float,
                pit_builder=None) -> pd.Series:
-    """Base (un-controlled) portfolio — point-in-time sleeve when a builder is given,
-    otherwise the static constant-mix. Keeps every exhibit consistent with /backtest."""
+    """Base (un-controlled) portfolio — EXACTLY as run_strategies builds it.
+
+    This must match `run_strategies` bit for bit, including the weight-rebalancing
+    grid and the rebalancing cost. Building it differently is what made the
+    parameter-stability grid report a Sharpe of 0.96 while the metrics table showed
+    0.933 for the identical configuration: the grid was running gross and daily.
+    """
+    from .backtest import weight_cost
     if pit_builder is None:
-        return st.buy_and_hold(returns, portfolio_weights(crypto_share, list(returns.columns), cfg))
+        weights = portfolio_weights(crypto_share, list(returns.columns), cfg)
+        gross, wpath = st.periodic_mix(returns, weights, cfg.weight_rebalance)
+        _turn, cost = weight_cost(wpath, cfg)
+        return gross - cost
     from . import sample as sm
     W, sleeve_cost, _ = pit_builder(crypto_share, returns.index)
-    return sm.weighted_portfolio(returns, W) - sleeve_cost
+    _turn, cost = weight_cost(W, cfg)
+    return sm.weighted_portfolio(returns, W) - sleeve_cost - cost
 
 
 def _stride(n: int, cap: int = 400) -> int:

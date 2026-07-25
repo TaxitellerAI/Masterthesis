@@ -128,6 +128,59 @@ def vol_control(port_returns: pd.Series, target_vol: float, lookback: int = 60,
     return strat.dropna(), exposure
 
 
+def _period_keys(idx: pd.DatetimeIndex, freq: str):
+    if freq == "monthly":
+        return [(d.year, d.month) for d in idx]
+    if freq == "quarterly":
+        return [(d.year, (d.month - 1) // 3) for d in idx]
+    return None                                    # "daily" -> no grouping
+
+
+def periodic_mix(asset_returns: pd.DataFrame, weights: dict, freq: str = "monthly"):
+    """Constant-mix rebalanced on a CALENDAR grid, drifting in between.
+
+    Daily rebalancing back to target is the textbook constant-mix but unrealistic for
+    a corporate treasury — and since turnover is now charged, daily rebalancing
+    PENALISES the comparison benchmark for behaviour no treasurer would exhibit.
+    Between rebalancing dates the weights therefore drift with relative performance;
+    at each period start they are reset to target.
+
+    Returns (portfolio_returns, weight_path). `freq="daily"` reproduces
+    `buy_and_hold` exactly, so the old specification remains available.
+    """
+    w = pd.Series(weights, dtype=float)
+    cols = [c for c in w.index if c in asset_returns.columns]
+    w = w[cols]
+    if w.sum() == 0:
+        raise ValueError("Weights sum to zero for the available asset universe.")
+    w = w / w.sum()
+    R = asset_returns[cols].fillna(0.0)
+
+    if freq == "daily":
+        wp = constant_mix_weight_path(asset_returns, weights)
+        return buy_and_hold(asset_returns, weights), wp
+
+    keys = _period_keys(R.index, freq)
+    if keys is None:
+        wp = constant_mix_weight_path(asset_returns, weights)
+        return buy_and_hold(asset_returns, weights), wp
+
+    gr = (1.0 + R.to_numpy())
+    n, k = gr.shape
+    held = np.empty((n, k))          # weights held INTO day t (known at t-1 close)
+    cur = w.to_numpy().copy()
+    prev_key = None
+    for t in range(n):
+        if keys[t] != prev_key:      # period boundary -> reset to target
+            cur = w.to_numpy().copy()
+            prev_key = keys[t]
+        held[t] = cur
+        val = cur * gr[t]
+        cur = val / val.sum()        # drift into the next day
+    port = pd.Series((held * R.to_numpy()).sum(axis=1), index=R.index)
+    return port, pd.DataFrame(held, index=R.index, columns=cols)
+
+
 def weights_turnover(W: pd.DataFrame) -> pd.Series:
     """Per-day one-way turnover Σ|Δw| implied by a weight path.
 

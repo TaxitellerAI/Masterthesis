@@ -158,6 +158,31 @@ def build_workbook(prices: pd.DataFrame, returns: pd.DataFrame, weights: dict,
     last = _col(na + 1)
     wsg.cell(3, 2, f"=SUM(B2:{last}2)").number_format = _PCT
 
+    from . import strategies as _stg
+    from .backtest import weight_cost as _weight_cost
+    # The base weights are rebalanced on cfg.weight_rebalance and DRIFT in between,
+    # so a single fixed weight row can no longer reproduce Buy-and-Hold. The held
+    # weight PATH is therefore written as its own sheet and the BH formula reads that
+    # row — the workbook keeps reproducing the engine exactly.
+    _bh_gross, _wpath = _stg.periodic_mix(returns, weights, cfg.weight_rebalance)
+    _bh_turn, _bh_cost = _weight_cost(_wpath, cfg)
+
+    # ── Gewichte_Pfad (values) ───────────────────────────────────────────────
+    wsw = wb.create_sheet("Gewichte_Pfad")
+    wsw.cell(1, 1, "Datum").font = _HEAD
+    wpath_cols = list(_wpath.columns)
+    for j, a_ in enumerate(wpath_cols):
+        wsw.cell(1, j + 2, a_).font = _HEAD
+    for k, d in enumerate(returns.index):
+        row = k + 3                     # same row offset as Renditen/Portfolio
+        wsw.cell(row, 1, pd.Timestamp(d).strftime("%Y-%m-%d"))
+        for j, a_ in enumerate(wpath_cols):
+            c = wsw.cell(row, j + 2)
+            c.value = round(float(_wpath.iloc[k][a_]), 10)
+            c.number_format = _NUM4
+    wsw.freeze_panes = "B2"
+    wp_first, wp_last = _col(2), _col(len(wpath_cols) + 1)
+
     # ── Portfolio (formulas) ─────────────────────────────────────────────────
     wsp = wb.create_sheet("Portfolio")
     heads = ["Datum", "BH-Rendite", "BH-Wealth", "BH-Peak", "BH-Drawdown",
@@ -170,9 +195,6 @@ def build_workbook(prices: pd.DataFrame, returns: pd.DataFrame, weights: dict,
     # Buy-and-Hold is a constant-mix: it trades back to target daily and is charged
     # for it in the engine. The cost therefore has to be visible here too, otherwise
     # the workbook would no longer reproduce the engine's Buy-and-Hold.
-    from . import strategies as _stg
-    from .backtest import weight_cost as _weight_cost
-    _bh_turn, _bh_cost = _weight_cost(_stg.constant_mix_weight_path(returns, weights), cfg)
     for j, h in enumerate(heads):
         wsp.cell(1, j + 1, h).font = _HEAD
     rlast = _col(na + 1)  # last asset column letter in Renditen
@@ -187,8 +209,8 @@ def build_workbook(prices: pd.DataFrame, returns: pd.DataFrame, weights: dict,
         # mirrors the engine's skipna aggregation and never yields #VALUE!.
         rng = f"Renditen!{_col(g_first)}{rr}:{_col(g_last)}{rr}"
         b = wsp.cell(row, 2)
-        b.value = (f"=SUMPRODUCT(IF(ISNUMBER({rng}),{rng},0),"
-                   f"Gewichte!$B$2:${last}$2)-M{row}")
+        wrng = f"Gewichte_Pfad!{wp_first}{row}:{wp_last}{row}"
+        b.value = (f"=SUMPRODUCT(IF(ISNUMBER({rng}),{rng},0),{wrng})-M{row}")
         b.number_format = _PCT
         # Wealth / Peak / Drawdown
         w = wsp.cell(row, 3)
@@ -293,6 +315,17 @@ def build_workbook(prices: pd.DataFrame, returns: pd.DataFrame, weights: dict,
     wh = wb.create_sheet("Hypothesen")
     wh.cell(1, 1, "Kennzahl").font = _HEAD
     wh.cell(1, 2, "Wert").font = _HEAD
+    def _cell(v):
+        """openpyxl only accepts scalars — lists/dicts (e.g. the Holm family, the
+        sweep-bootstrap block) are summarised as text instead of crashing the export."""
+        if isinstance(v, float):
+            return round(v, 6)
+        if isinstance(v, (int, str, bool)) or v is None:
+            return v
+        if isinstance(v, (list, tuple)):
+            return ", ".join(str(x) for x in v)[:500]
+        return str(v)[:500]
+
     rr = 2
     for k, v in extras.get("hypotheses", {}).items():
         wh.cell(rr, 1, k).font = _HEAD
@@ -300,10 +333,10 @@ def build_workbook(prices: pd.DataFrame, returns: pd.DataFrame, weights: dict,
             rr += 1
             for kk, vv in v.items():
                 wh.cell(rr, 1, f"   {kk}")
-                wh.cell(rr, 2, round(vv, 6) if isinstance(vv, float) else vv)
+                wh.cell(rr, 2, _cell(vv))
                 rr += 1
         else:
-            wh.cell(rr, 2, round(v, 6) if isinstance(v, float) else v)
+            wh.cell(rr, 2, _cell(v))
             rr += 1
     wh.cell(rr + 1, 1, "Bootstrap/Wilcoxon/HAC in Python berechnet (fixer Seed, reproduzierbar).").font = _MUTE
 

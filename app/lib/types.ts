@@ -218,6 +218,11 @@ export interface HypothesesResponse {
   H3_dCVaR_mann_kendall: MannKendall;
   H3_dMDD_boot_slope: BootSlope;
   H3_dCVaR_boot_slope: BootSlope;
+  /** Data-level bootstrap of the whole sweep (engine: sweepboot.sweep_bootstrap). */
+  sweep_bootstrap: SweepBootstrap | null;
+  h3_family_basis: "data_level_sweep_bootstrap" | "sweep_level_hac_ols";
+  holm_adjusted_sweep_level_h3: Record<string, number>;
+  sweep_level_note: string;
   holm_adjusted: Record<string, number>;           // confirmatory family only
   holm_adjusted_incl_wilcoxon: Record<string, number>; // documented alternative
   holm_family: string[];
@@ -225,6 +230,44 @@ export interface HypothesesResponse {
   deflated_sharpe: DeflatedSharpe;
   probabilistic_sharpe: { sr: number; psr: number };
   sweep: SweepPoint[];
+}
+
+/** Sweep bootstrap on the DATA level — H3 slope + TF4 argmax (engine: sweepboot). */
+export interface SweepBootstrap {
+  n_boot: number;
+  criterion: string;
+  criterion_note: string;
+  alpha: number;
+  shares: number[];
+  observations: number;
+  runtime_seconds?: number;
+  simplifications: Record<string, unknown>;
+  bands: Record<
+    string,
+    {
+      point: (number | null)[];
+      pointwise_low: (number | null)[];
+      pointwise_high: (number | null)[];
+      simultaneous_low: (number | null)[];
+      simultaneous_high: (number | null)[];
+      simultaneous_factor: number;
+    }
+  >;
+  slopes: Record<
+    string,
+    { slope: number; ci_low: number; ci_high: number; p_value: number; share_positive: number }
+  >;
+  argmax: {
+    best_share_point: number;
+    distribution: { share: number; freq: number; prob: number }[];
+    share_ci_low: number;
+    share_ci_high: number;
+    naive_ci_warning: string;
+    indistinguishable_shares: number[];
+    indistinguishable_range: [number, number] | null;
+    diff_ci_low: (number | null)[];
+    diff_ci_high: (number | null)[];
+  };
 }
 
 /** The single request shape accepted by every engine endpoint. */
@@ -280,7 +323,9 @@ export interface SampleReport {
   requested_end: string;
   effective_start: string;
   effective_end: string;
-  n_rows: number;
+  n_rows: number;              // legacy alias = n_price_rows
+  n_price_rows?: number;       // retained PRICE rows
+  n_return_days?: number;      // return days derived from them (= price rows - 1)
   n_rows_in_window: number;
   n_dropped: number;
   drop_reason: string;
