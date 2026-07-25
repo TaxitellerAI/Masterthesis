@@ -19,7 +19,12 @@ def test_pipeline():
     # BuyHold + one row per target vol, plus any available benchmarks
     assert table.shape[0] >= 1 + len(cfg.target_vols)
     assert {"BuyHold", "VolControl_5"}.issubset(set(table.index))
-    assert np.isfinite(table.values).all()
+    # Core metrics must be finite for EVERY strategy. The *_gross columns are
+    # deliberately empty where a strategy has no separate gross variant
+    # (vol-control, true buy-and-hold), so they are excluded here.
+    core = ["ann_return", "cagr", "ann_vol", "sharpe", "max_drawdown", "cvar_95",
+            "turnover", "observations"]
+    assert np.isfinite(table[core].values).all()
 
     # vol-control should not have HIGHER realised vol than buy-and-hold at the
     # tightest target (sanity, not a guarantee under costs)

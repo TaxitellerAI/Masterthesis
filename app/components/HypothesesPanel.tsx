@@ -30,7 +30,9 @@ export default function HypothesesPanel({ data, loading }: Props) {
     <section>
       <div className="flex items-baseline justify-between mb-3">
         <h2 className="display text-lg">Hypothesen &amp; Inferenz</h2>
-        <span className="eyebrow">α = 5 % · Holm-korrigiert</span>
+        <span className="eyebrow">
+          α = 5 % · Holm über {data?.holm_family?.length ?? 4} konfirmatorische Tests
+        </span>
       </div>
 
       {!data && (
@@ -156,12 +158,14 @@ export default function HypothesesPanel({ data, loading }: Props) {
             ))}
           </div>
 
-          {/* Wilcoxon supporting line */}
+          {/* Wilcoxon — DESCRIPTIVE companion, deliberately outside the Holm family */}
           <div className="border border-hairline bg-paper px-4 py-2.5 flex items-center justify-between text-xs text-muted nums">
-            <span>Wilcoxon (tägliche Renditen, gepaart)</span>
+            <span>
+              Wilcoxon (tägliche Renditen, gepaart) —{" "}
+              <span className="text-faint">deskriptiv, nicht Teil der Holm-Familie</span>
+            </span>
             <span className="tabular-nums">
-              Statistik {data.wilcoxon_daily.statistic.toLocaleString("de-DE")} · p {pval(data.wilcoxon_daily.p_value)} ·
-              Holm {pval(data.holm_adjusted["wilcoxon_daily"])}
+              Statistik {data.wilcoxon_daily.statistic.toLocaleString("de-DE")} · p {pval(data.wilcoxon_daily.p_value)}
             </span>
           </div>
         </div>

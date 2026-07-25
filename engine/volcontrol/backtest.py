@@ -36,6 +36,20 @@ def _blended_cost_bps(crypto_share: float, cfg: EngineConfig) -> float:
     return (1.0 - crypto_share) * cfg.cost_traditional_bps + crypto_share * cfg.cost_crypto_bps
 
 
+def weight_cost(W: pd.DataFrame, cfg: EngineConfig) -> tuple:
+    """(turnover, cost) implied by a weight path, priced per asset class.
+
+    Crypto legs are charged cost_crypto_bps, everything else cost_traditional_bps.
+    Constant-mix and risk-parity DO trade — pretending their turnover is zero made
+    the vol-control comparison inconsistent (only one side paid costs).
+    """
+    dw = W.diff().abs().fillna(0.0)
+    bps = pd.Series(
+        {c: (cfg.cost_crypto_bps if c in cfg.crypto else cfg.cost_traditional_bps)
+         for c in W.columns}, dtype=float)
+    return dw.sum(axis=1), (dw * bps).sum(axis=1) / 1e4
+
+
 def run_strategies(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
                    crypto_share: float = 0.10, pit_builder=None) -> dict:
     """`pit_builder` (optional) switches the BASE portfolio to a point-in-time sleeve
@@ -46,24 +60,46 @@ def run_strategies(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
     sleeve_info = None
     if pit_builder is None:
         weights = portfolio_weights(crypto_share, available, cfg)
-        port = st.buy_and_hold(returns, weights)
+        port_gross = st.buy_and_hold(returns, weights)
+        # Constant-mix means trading back to target every day. That is real turnover
+        # and it is charged, so the base portfolio and vol-control face the SAME
+        # underlying cost assumption (vol-control then pays its exposure cost on top).
+        bh_turn, bh_cost = weight_cost(st.constant_mix_weight_path(returns, weights), cfg)
+        port = port_gross - bh_cost
     else:
         W, sleeve_cost, sleeve_info = pit_builder(crypto_share, returns.index)
         # Re-spreading the sleeve when a coin enters is a REAL trade and is charged
         # at the crypto cost — otherwise the growing basket would look free.
-        port = sm.weighted_portfolio(returns, W) - sleeve_cost
+        bh_turn, bh_cost = weight_cost(W, cfg)
+        port_gross = sm.weighted_portfolio(returns, W) - sleeve_cost
+        port = port_gross - bh_cost
         weights = {c: round(float(W[c].iloc[-1]), 6) for c in W.columns}
 
-    def _summ(series):
+    def _summ(series, gross=None, turnover=0.0):
         # rf is aligned to each strategy's OWN calendar (they differ in length
         # after warm-up/dropna), so every metric uses the rate that truly applied.
-        return mt.summary(series.values, cfg.rf_for(series.index),
-                          cfg.trading_days, cfg.cvar_alpha)
+        out = mt.summary(series.values, cfg.rf_for(series.index),
+                         cfg.trading_days, cfg.cvar_alpha)
+        # Strategies run on different calendars (risk parity drops a warm-up), so n
+        # and the effective window travel WITH each row — comparing without them
+        # would be misleading.
+        out["observations"] = int(len(series))
+        out["start"] = str(series.index.min().date()) if len(series) else None
+        out["end"] = str(series.index.max().date()) if len(series) else None
+        out["turnover"] = float(turnover)
+        if gross is not None:      # keep the cost effect visible, never silently net
+            g = mt.summary(gross.values, cfg.rf_for(gross.index),
+                           cfg.trading_days, cfg.cvar_alpha)
+            out["ann_return_gross"] = g["ann_return"]
+            out["cagr_gross"] = g["cagr"]
+            out["sharpe_gross"] = g["sharpe"]
+        return out
 
     out = {"weights": weights, "crypto_share": crypto_share, "strategies": {}}
     if sleeve_info is not None:
         out["sleeve"] = sleeve_info
-    out["strategies"]["BuyHold"] = {"returns": port, "turnover": 0.0, **_summ(port)}
+    out["strategies"]["BuyHold"] = {"returns": port,
+                                    **_summ(port, gross=port_gross, turnover=bh_turn.sum())}
 
     for tv in cfg.target_vols:
         strat, exposure = st.vol_control(
@@ -74,27 +110,35 @@ def run_strategies(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
         out["strategies"][f"VolControl_{int(tv*100)}"] = {
             "returns": strat,
             "exposure": exposure,
-            "turnover": float(exposure.diff().abs().sum()),
-            **_summ(strat),
+            **_summ(strat, turnover=float(exposure.diff().abs().sum())),
         }
 
     # --- comparators ---
     # True buy-and-hold (drift, zero turnover) — the honest low-turnover baseline
     # next to the daily-rebalanced constant-mix used as the vol-control base.
     if pit_builder is None:      # a drifting basket is undefined when members enter later
+        # TrueBH is the ONLY strategy whose zero turnover is factually correct:
+        # it buys once and never trades again.
         tbh = st.true_buy_and_hold(returns, weights)
-        out["strategies"]["Benchmark_TrueBH"] = {"returns": tbh, "turnover": 0.0, **_summ(tbh)}
+        out["strategies"]["Benchmark_TrueBH"] = {"returns": tbh, **_summ(tbh, turnover=0.0)}
 
     if "MSCI_World" in available and "Global_Bonds" in available:
-        p6040 = st.buy_and_hold(returns, {"MSCI_World": 0.6, "Global_Bonds": 0.4})
-        out["strategies"]["Benchmark_6040"] = {"returns": p6040, "turnover": 0.0, **_summ(p6040)}
+        w6040 = {"MSCI_World": 0.6, "Global_Bonds": 0.4}
+        g6040 = st.buy_and_hold(returns, w6040)
+        t6040, c6040 = weight_cost(st.constant_mix_weight_path(returns, w6040), cfg)
+        n6040 = g6040 - c6040
+        out["strategies"]["Benchmark_6040"] = {
+            "returns": n6040, **_summ(n6040, gross=g6040, turnover=t6040.sum())}
 
     # Rolling (time-varying) inverse-vol risk parity — more realistic than static
     # full-sample weights.
     if returns.shape[1] >= 2 and len(returns) > 80:
-        prp = st.rolling_risk_parity(returns)
-        if len(prp) > 20:
-            out["strategies"]["Benchmark_RiskParity"] = {"returns": prp, "turnover": 0.0, **_summ(prp)}
+        prp_gross, Wrp = st.rolling_risk_parity(returns, return_weights=True)
+        if len(prp_gross) > 20:
+            trp, crp = weight_cost(Wrp, cfg)
+            prp = prp_gross - crp
+            out["strategies"]["Benchmark_RiskParity"] = {
+                "returns": prp, **_summ(prp, gross=prp_gross, turnover=trp.sum())}
 
     return out
 
@@ -111,15 +155,26 @@ def metrics_table(run_result: dict) -> pd.DataFrame:
             "max_drawdown": d["max_drawdown"],
             "cvar_95": d["cvar_95"],
             "turnover": d.get("turnover", 0.0),
+            "observations": d.get("observations"),
+            "start": d.get("start"),
+            "end": d.get("end"),
+            "ann_return_gross": d.get("ann_return_gross"),
+            "cagr_gross": d.get("cagr_gross"),
+            "sharpe_gross": d.get("sharpe_gross"),
         })
     return pd.DataFrame(rows).set_index("strategy").round(4)
+
+
+def sweep_shares(cfg: EngineConfig) -> np.ndarray:
+    """The crypto-share grid — one definition, used by the sweep AND the DSR trials."""
+    return np.round(np.arange(0.0, cfg.sweep_max_share + 1e-9, cfg.sweep_step), 4)
 
 
 def crypto_sweep(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
                  target_vol: float = 0.10, shares=None, pit_builder=None) -> pd.DataFrame:
     """Vary the crypto allocation 0..50% and record the vol-control effect sizes."""
     if shares is None:
-        shares = np.round(np.arange(0.0, 0.5001, 0.025), 4)
+        shares = sweep_shares(cfg)
     rows = []
     for s in shares:
         if pit_builder is None:
@@ -143,6 +198,56 @@ def crypto_sweep(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
             "sharpe_vc": vc["sharpe"],
         })
     return pd.DataFrame(rows)
+
+
+def dsr_trial_returns(returns: pd.DataFrame, cfg: EngineConfig, crypto_share: float,
+                      target_vol: float, pit_builder=None) -> list:
+    """Return series of EVERY vol-control configuration this study actually explores.
+
+    The Deflated Sharpe deflates the selected Sharpe by the expected maximum that
+    N independent trials would produce by luck. Feeding it only the four rows of
+    the metrics table understates the search badly: the study additionally scans
+
+        * the parameter-stability grid  cfg.stability_lookbacks x cfg.stability_target_vols
+        * the crypto-share sweep        sweep_shares(cfg) at the selected target vol
+
+    Both grids are read from the config, so this set can never drift apart from what
+    the exhibits actually compute. Configurations are de-duplicated by
+    (lookback, target_vol, crypto_share) so the overlap of the two grids is counted once.
+
+    Note the formula also needs the VARIANCE of Sharpe across trials, so the real
+    series are returned — simply raising N would be wrong.
+    """
+    trials: dict[tuple, np.ndarray] = {}
+
+    def _add(lb, tv, share, port):
+        key = (int(lb), round(float(tv), 6), round(float(share), 6))
+        if key in trials:
+            return
+        strat, _ = st.vol_control(
+            port, tv, lb, cfg.rf_for(port.index), cfg.trading_days, cfg.max_leverage,
+            _blended_cost_bps(share, cfg), cfg.vol_method, cfg.ewma_halflife,
+            cfg.rebalance, cfg.dead_band,
+        )
+        trials[key] = strat.values
+
+    def _port(share):
+        if pit_builder is None:
+            return st.buy_and_hold(returns, portfolio_weights(share, list(returns.columns), cfg))
+        W, sleeve_cost, _ = pit_builder(share, returns.index)
+        return sm.weighted_portfolio(returns, W) - sleeve_cost
+
+    # 1) parameter-stability grid at the selected crypto share
+    base_port = _port(crypto_share)
+    for lb in cfg.stability_lookbacks:
+        for tv in cfg.stability_target_vols:
+            _add(lb, tv, crypto_share, base_port)
+
+    # 2) crypto-share sweep at the selected target vol and base lookback
+    for share in sweep_shares(cfg):
+        _add(cfg.lookback, target_vol, float(share), _port(float(share)))
+
+    return list(trials.values())
 
 
 def hypothesis_tests(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
@@ -179,19 +284,32 @@ def hypothesis_tests(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
     h3_mdd_boot = stx.bootstrap_slope(shares, sweep["d_mdd"].values, seed=cfg.seed)
     h3_cvar_boot = stx.bootstrap_slope(shares, sweep["d_cvar"].values, seed=cfg.seed)
 
-    # Family-wise error control across the primary hypotheses.
-    holm = stx.holm_correction({
+    # Family-wise error control across the CONFIRMATORY family only.
+    #
+    # The family is defined by the pre-specified research questions — H1 (drawdown),
+    # H2 (Sharpe) and the two H3 interaction slopes. The Wilcoxon test on paired
+    # DAILY returns answers none of them: it asks whether the two return
+    # DISTRIBUTIONS differ at all, which at n > 1400 is almost mechanically
+    # significant and says nothing about drawdown, Sharpe or the crypto interaction.
+    # It is therefore reported as a DESCRIPTIVE companion outside the correction.
+    #
+    # This is a content-driven definition, not a result-driven one: the decision
+    # rests on which tests answer a stated hypothesis, and it was made without
+    # regard to which side of alpha the p-values fall on. Both variants are reported
+    # (holm_adjusted vs. holm_adjusted_incl_wilcoxon) so the effect of the choice is
+    # documented rather than hidden.
+    confirmatory = {
         "H1_max_drawdown": h1["p_value"],
         "H2_sharpe": h2["p_value"],
-        "wilcoxon_daily": wilcox["p_value"],
         "H3_dMDD_vs_share": h3_mdd["p_value"],
         "H3_dCVaR_vs_share": h3_cvar["p_value"],
-    })
+    }
+    holm = stx.holm_correction(confirmatory)
+    holm_with_wilcox = stx.holm_correction({**confirmatory, "wilcoxon_daily": wilcox["p_value"]})
 
-    # Deflated Sharpe of the selected vol-control strategy against the family of
-    # configurations tried (guards the Sharpe against data-snooping).
-    trials = [d["returns"].values for k, d in run["strategies"].items()
-              if k.startswith("VolControl") or k == "BuyHold"]
+    # Deflated Sharpe against the configurations the study REALLY explored
+    # (stability grid + sweep), not just the rows of the metrics table.
+    trials = dsr_trial_returns(returns, cfg, crypto_share, target_vol, pit_builder)
     dsr = stx.deflated_sharpe_ratio(vc, trials)
     psr = stx.probabilistic_sharpe_ratio(vc)
 
@@ -206,6 +324,11 @@ def hypothesis_tests(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
         "H3_dMDD_boot_slope": h3_mdd_boot,
         "H3_dCVaR_boot_slope": h3_cvar_boot,
         "holm_adjusted": holm,
+        "holm_adjusted_incl_wilcoxon": holm_with_wilcox,
+        "holm_family": list(confirmatory.keys()),
+        "holm_note": ("Konfirmatorische Familie = vorab spezifizierte Hypothesen H1, H2 und die "
+                      "beiden H3-Steigungen. Der Wilcoxon-Test auf Tagesrenditen beantwortet keine "
+                      "davon und wird deskriptiv AUSSERHALB der Holm-Korrektur berichtet."),
         "deflated_sharpe": dsr,
         "probabilistic_sharpe": psr,
         "sweep": sweep,

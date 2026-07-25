@@ -238,7 +238,8 @@ def test_s1_fixed_matches_static_path_exactly():
     old = metrics_table(run_strategies(rets, cfg, 0.10))
     new = metrics_table(run_strategies(rets, cfg, 0.10, pit_builder=None))
     assert old.equals(new)
-    assert float((old - new).abs().max().max()) == 0.0
+    num_cols = old.select_dtypes("number").columns          # start/end are strings
+    assert float((old[num_cols] - new[num_cols]).abs().max().max()) == 0.0
 
 
 def test_s1_effective_sample_bounds():
@@ -277,6 +278,86 @@ def test_sleeve_entry_is_charged():
     assert info["events"] >= 2          # ETH/XRP/BNB enter, later SOL
     assert info["total_cost"] > 0.0
     assert cost.sum() > 0.0
+
+
+def test_constant_mix_turnover_is_positive():
+    """Constant-mix trades back to target daily — its turnover is NOT zero."""
+    from volcontrol import strategies as stt
+    from volcontrol.config import EngineConfig
+    from volcontrol.backtest import run_strategies
+    r = simple_returns(load_prices(_FROZEN)[["MSCI_World", "Global_Bonds", "Gold",
+                                             "Bitcoin", "Ethereum", "XRP"]].dropna())
+    cm = stt.constant_mix_weight_path(r, {"MSCI_World": 0.6, "Global_Bonds": 0.3, "Gold": 0.1})
+    assert float((cm.sum(axis=1) - 1.0).abs().max()) < 1e-12
+    assert float(stt.weights_turnover(cm).sum()) > 0.0
+
+    run = run_strategies(r, EngineConfig(rf_mode="constant"), 0.10)
+    assert run["strategies"]["BuyHold"]["turnover"] > 0.0
+    assert run["strategies"]["Benchmark_6040"]["turnover"] > 0.0
+    assert run["strategies"]["Benchmark_RiskParity"]["turnover"] > 0.0
+    # TrueBH is the only one whose zero is factually right
+    assert run["strategies"]["Benchmark_TrueBH"]["turnover"] == 0.0
+
+
+def test_gross_beats_net_when_costs_apply():
+    """Net metrics must be worse than gross whenever turnover was charged."""
+    from volcontrol.config import EngineConfig
+    from volcontrol.backtest import run_strategies
+    r = simple_returns(load_prices(_FROZEN)[["MSCI_World", "Global_Bonds", "Gold",
+                                             "Bitcoin", "Ethereum", "XRP"]].dropna())
+    bh = run_strategies(r, EngineConfig(rf_mode="constant"), 0.10)["strategies"]["BuyHold"]
+    assert bh["ann_return_gross"] > bh["ann_return"]
+
+
+def test_strategies_report_own_sample_size():
+    """Each row carries n + window; risk parity must be visibly shorter."""
+    from volcontrol.config import EngineConfig
+    from volcontrol.backtest import run_strategies
+    r = simple_returns(load_prices(_FROZEN)[["MSCI_World", "Global_Bonds", "Gold",
+                                             "Bitcoin", "Ethereum", "XRP"]].dropna())
+    st_ = run_strategies(r, EngineConfig(rf_mode="constant"), 0.10)["strategies"]
+    for d in st_.values():
+        assert d["observations"] > 0 and d["start"] and d["end"]
+    assert st_["Benchmark_RiskParity"]["observations"] < st_["BuyHold"]["observations"]
+
+
+def test_dsr_counts_the_real_search_space():
+    """DSR must deflate by the grids actually explored, not the 4 table rows."""
+    from volcontrol.config import EngineConfig
+    from volcontrol.backtest import dsr_trial_returns, sweep_shares
+    cfg = EngineConfig(rf_mode="constant")
+    r = simple_returns(load_prices(_FROZEN)[["MSCI_World", "Global_Bonds", "Gold",
+                                             "Bitcoin", "Ethereum", "XRP"]].dropna())
+    trials = dsr_trial_returns(r, cfg, 0.10, 0.10)
+    grid = len(cfg.stability_lookbacks) * len(cfg.stability_target_vols)
+    assert len(trials) > grid                      # grid PLUS the sweep
+    assert len(trials) <= grid + len(sweep_shares(cfg))
+    assert len(trials) > 4                         # the old, wrong count
+
+
+def test_wilcoxon_outside_holm_family():
+    """Confirmatory family = pre-specified hypotheses only; Wilcoxon is descriptive."""
+    from volcontrol.config import EngineConfig
+    from volcontrol.backtest import hypothesis_tests
+    r = simple_returns(load_prices(_FROZEN)[["MSCI_World", "Global_Bonds", "Gold",
+                                             "Bitcoin", "Ethereum", "XRP"]].dropna())
+    res = hypothesis_tests(r, EngineConfig(rf_mode="constant", bootstrap_n=200), 0.10, 0.10)
+    assert "wilcoxon_daily" not in res["holm_adjusted"]
+    assert "wilcoxon_daily" in res["holm_adjusted_incl_wilcoxon"]
+    assert set(res["holm_family"]) == {"H1_max_drawdown", "H2_sharpe",
+                                       "H3_dMDD_vs_share", "H3_dCVaR_vs_share"}
+    assert res["wilcoxon_daily"]["p_value"] >= 0.0     # still reported
+
+
+def test_rf_negative_share_comes_from_the_window():
+    """The negative-rate share must be computed per window, not hard-coded."""
+    from volcontrol.data import load_rf_frozen
+    rf, _ = load_rf_frozen(os.path.join(os.path.dirname(__file__), "..",
+                                        "data", "frozen_rf_eur.csv"))
+    early = float((rf.loc["2018-01-01":"2019-12-31"] < 0).mean())
+    late = float((rf.loc["2023-01-01":"2025-12-31"] < 0).mean())
+    assert early > 0.9 and late == 0.0      # negative then, positive later
+    assert early != late                     # a single constant cannot describe both
 
 
 if __name__ == "__main__":

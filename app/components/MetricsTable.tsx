@@ -12,6 +12,11 @@ interface Props {
 
 export default function MetricsTable({ data, loading, selectedTargetVol }: Props) {
   const selectedKey = `VolControl_${Math.round(selectedTargetVol * 100)}`;
+  // Flag rows that do NOT span the full sample, so a shorter series is never
+  // silently compared against the others.
+  const maxN = Math.max(0, ...(data?.metrics ?? []).map((m) => m.observations ?? 0));
+  const shortSample = (m: { observations?: number | null }) =>
+    maxN > 0 && (m.observations ?? maxN) < maxN;
 
   return (
     <section>
@@ -38,13 +43,15 @@ export default function MetricsTable({ data, loading, selectedTargetVol }: Props
               <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap cursor-help"
                   title="Conditional Value-at-Risk (95 %) — erwarteter Verlust in den schlechtesten 5 % der Tage.">CVaR 95 %</th>
               <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap cursor-help"
-                  title="Turnover — Summe der absoluten Exposure-Änderungen (Σ|Δ Exposure|); Näherung für die Handelsaktivität.">Turnover</th>
+                  title="Turnover — kumulierte Σ|Δ Gewicht| bzw. Σ|Δ Exposure|. Constant-Mix und Risk-Parity handeln tatsächlich; nur True BH (Drift) hat echte Null.">Turnover</th>
+              <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap cursor-help"
+                  title="Anzahl Handelstage dieser Strategie. Risk-Parity verwirft eine Warm-up-Phase und läuft daher auf einem kürzeren Sample.">n</th>
             </tr>
           </thead>
           <tbody>
             {!data && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-faint">
+                <td colSpan={9} className="px-4 py-8 text-center text-faint">
                   {loading ? "Berechnung läuft…" : "Keine Daten."}
                 </td>
               </tr>
@@ -82,8 +89,14 @@ export default function MetricsTable({ data, loading, selectedTargetVol }: Props
                   >
                     {pct(m.cvar_95)}
                   </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-faint">
-                    {m.turnover > 0 ? num(m.turnover, 1) : "—"}
+                  <td className="px-3 py-2.5 text-right tabular-nums text-faint"
+                      title={m.sharpe_gross != null ? `Sharpe brutto (ohne Kosten): ${num(m.sharpe_gross, 3)}` : undefined}>
+                    {m.turnover > 0 ? num(m.turnover, 1) : "0,0"}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-faint"
+                      style={shortSample(m) ? { color: "var(--color-warn, #b8843f)" } : undefined}
+                      title={m.start && m.end ? `${m.start} – ${m.end}` : undefined}>
+                    {m.observations != null ? m.observations.toLocaleString("de-DE") : "—"}
                   </td>
                 </tr>
               );
@@ -92,6 +105,13 @@ export default function MetricsTable({ data, loading, selectedTargetVol }: Props
         </table>
       </div>
       <p className="text-faint text-xs mt-2">
+        <strong>Turnover</strong> ist für alle gewichtsbasierten Strategien real gerechnet (Σ|Δ Gewicht|)
+        und mit denselben Kostensätzen belastet wie die Vol-Control; nur <strong>True BH (Drift)</strong>
+        hat echte Null. Ausgewiesen sind Netto-Kennzahlen — die Brutto-Sharpe (ohne Kosten) steht im
+        Tooltip der Turnover-Spalte. <strong>n</strong> = Handelstage je Strategie; orange markierte
+        Zeilen laufen auf einem <em>kürzeren</em> Fenster (Risk-Parity verwirft eine Warm-up-Phase)
+        und sind daher nur eingeschränkt direkt vergleichbar.
+        <br />
         Blau = gewählte Zielvolatilität; kursiv = alternative Benchmarks. Rot = gesetztes Risiko-Limit
         überschritten. <strong>Buy-and-Hold</strong> ist als Constant-Mix implementiert (feste Gewichte
         ≙ tägliches Rebalancing auf die Zielallokation); <strong>True BH (Drift)</strong> = einmalige

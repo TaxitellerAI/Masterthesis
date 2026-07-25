@@ -128,8 +128,37 @@ def vol_control(port_returns: pd.Series, target_vol: float, lookback: int = 60,
     return strat.dropna(), exposure
 
 
+def weights_turnover(W: pd.DataFrame) -> pd.Series:
+    """Per-day one-way turnover Σ|Δw| implied by a weight path.
+
+    A constant-mix portfolio holds FIXED weights, which means it trades back to
+    target every day as prices move — that is real turnover, not zero. This makes
+    it measurable for any strategy that can state its realised weight path.
+    """
+    return W.diff().abs().sum(axis=1).fillna(0.0)
+
+
+def constant_mix_weight_path(asset_returns: pd.DataFrame, weights: dict) -> pd.DataFrame:
+    """Weight path a constant-mix portfolio must trade back to each day.
+
+    Between rebalances the weights DRIFT with relative performance; at the close
+    they are reset to target. The traded amount is therefore the gap between the
+    drifted weights and the target — this returns the drifted path, so
+    `weights_turnover` measures exactly that gap.
+    """
+    w = pd.Series(weights, dtype=float)
+    cols = [c for c in w.index if c in asset_returns.columns]
+    w = w[cols]
+    w = w / w.sum()
+    r = asset_returns[cols].fillna(0.0)
+    drifted = w.values * (1.0 + r.values)                 # value shares before reset
+    drifted = drifted / drifted.sum(axis=1, keepdims=True)
+    return pd.DataFrame(drifted, index=asset_returns.index, columns=cols)
+
+
 def rolling_risk_parity(returns: pd.DataFrame, lookback: int = 63,
-                        rebalance: str = "monthly", td: int = 252) -> pd.Series:
+                        rebalance: str = "monthly", td: int = 252,
+                        return_weights: bool = False):
     """Rolling (time-varying) inverse-volatility portfolio — a more realistic
     risk-parity benchmark than static full-sample weights. Weights are recomputed
     from trailing volatility and rebalanced on a weekly/monthly grid, shifted one
@@ -152,7 +181,10 @@ def rolling_risk_parity(returns: pd.DataFrame, lookback: int = 63,
 
     w = w.fillna(0.0)
     port = (returns.fillna(0.0) * w).sum(axis=1)
-    return port[w.sum(axis=1) > 0.5]                        # drop the warm-up period
+    live = w.sum(axis=1) > 0.5                              # drop the warm-up period
+    if return_weights:                                      # backwards-compatible opt-in
+        return port[live], w[live]
+    return port[live]
 
 
 def inverse_vol_weights(returns: pd.DataFrame, lookback: int | None = None) -> dict:

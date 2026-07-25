@@ -14,7 +14,7 @@ const COLS = [
   { key: "ann_vol", label: "Vol p.a.", fmt: (v: number) => pct(v) },
   { key: "sharpe", label: "Sharpe", fmt: (v: number) => num(v, 3) },
   { key: "skew", label: "Schiefe", fmt: (v: number) => num(v, 2) },
-  { key: "excess_kurtosis", label: "Kurtosis", fmt: (v: number) => num(v, 2) },
+  { key: "excess_kurtosis", label: "Exzess-Kurt.", fmt: (v: number) => num(v, 2) },
   { key: "max_drawdown", label: "Max DD", fmt: (v: number) => pct(v) },
   { key: "var_95", label: "VaR 95 %", fmt: (v: number) => pct(v) },
   { key: "cvar_95", label: "CVaR 95 %", fmt: (v: number) => pct(v) },
@@ -48,6 +48,22 @@ export default function DescriptiveStats({ data, loading }: Props) {
 
       {data && (
         <div className="space-y-5">
+          {/* Which data this block describes — must match the backtest, or ch. 4.1
+              and ch. 4.2 of the thesis would describe different data sets. */}
+          {data.scope && (
+            <div className="mb-3 border-l-2 border-accent pl-3 text-xs text-muted leading-snug">
+              Kennzahlen beziehen sich auf das <strong>aktive Sample-Fenster</strong>{" "}
+              <span className="nums tabular-nums text-ink">
+                {data.scope.start} – {data.scope.end}
+              </span>{" "}
+              (n = {data.scope.observations.toLocaleString("de-DE")}) — identisch zur Datenbasis des
+              Backtests.
+              {data.scope.partial_years.length > 0 && (
+                <> Teiljahre im Sample: {data.scope.partial_years.join(", ")}.</>
+              )}
+            </div>
+          )}
+
           {/* Provenance / sample window */}
           <div className="flex flex-wrap gap-x-8 gap-y-1 text-xs text-muted nums border border-hairline bg-panel px-4 py-2.5">
             <span>
@@ -198,6 +214,8 @@ export default function DescriptiveStats({ data, loading }: Props) {
       <p className="text-faint text-xs mt-2 leading-snug">
         Je Asset auf seinem <em>eigenen</em> Handelskalender: Krypto handelt ~365 Tage/Jahr,
         Aktien/Anleihen ~252 — daher unterschiedliche N und Annualisierung (Spalte „Tage/J").
+        <strong> Exzess-Kurtosis</strong>: Normalverteilung = 0 (nicht 3); positive Werte = fettere
+        Ränder als die Normalverteilung.
         Korrelation und Backtest nutzen dagegen das gemeinsame, ausgerichtete Fenster (Aligned N);
         Feiertage werden nicht aufgefüllt. Werte aus <code>describe</code> der Engine.
       </p>

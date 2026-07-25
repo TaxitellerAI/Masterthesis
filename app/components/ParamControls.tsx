@@ -1,10 +1,12 @@
 "use client";
 
-import type { EngineParams } from "@/lib/types";
+import type { EngineParams, RfInfo } from "@/lib/types";
 
 interface Props {
   params: EngineParams;
   onChange: (next: Partial<EngineParams>) => void;
+  /** Live rf facts from the engine — never hard-code window-dependent numbers. */
+  rf?: RfInfo | null;
 }
 
 // The engine only computes vol-control variants at 5/10/15 % and indexes them as
@@ -14,7 +16,9 @@ const TARGET_VOLS = [0.05, 0.1, 0.15];
 
 // The four strategy/market parameters, shared by the configurator and the
 // results sidebar so the two never drift apart.
-export default function ParamControls({ params, onChange }: Props) {
+export default function ParamControls({ params, onChange, rf = null }: Props) {
+  const negShare = rf?.estr?.window_share_negative;
+  const negTxt = negShare != null ? `${(negShare * 100).toFixed(0)} %` : null;
   return (
     <div className="space-y-7">
       {/* Zielvolatilität */}
@@ -86,8 +90,9 @@ export default function ParamControls({ params, onChange }: Props) {
           })}
         </div>
         <p className="text-faint text-xs mt-2 leading-snug">
-          EUR + 3M-EURIBOR entspricht der Thesis. Bei Live-Daten werden die USD-Kurse
-          via EURUSD nach EUR umgerechnet.
+          EUR ist die Basiswährung der Thesis; der risikofreie Zins ist die realisierte
+          €STR/EONIA-Tagesreihe (siehe unten), nicht der 3M-EURIBOR. Kurse werden über
+          EURUSD nach EUR umgerechnet.
         </p>
       </div>
 
@@ -137,9 +142,17 @@ export default function ParamControls({ params, onChange }: Props) {
         ) : (
           <p className="text-faint text-xs leading-snug">
             Tagesgenaue realisierte Zinsreihe: €STR ab Okt 2019, davor EONIA − 8,5 bp (ECB SDMX,
-            eingefroren). In ~59 % der Tage dieses Fensters war der Zins <em>negativ</em> — eine
-            feste Konstante würde der Cash-Quote der Vol-Control einen Ertrag gutschreiben, den
-            sie nie verdient hat. „Konstant“ bleibt für die Sensitivitätsanalyse.
+            eingefroren).{" "}
+            {negTxt ? (
+              <>
+                In <span className="nums tabular-nums">{negTxt}</span> der Tage{" "}
+                <em>dieses</em> Fensters war der Zins negativ
+              </>
+            ) : (
+              <>In weiten Teilen des Fensters war der Zins negativ</>
+            )}{" "}
+            — eine feste Konstante würde der Cash-Quote der Vol-Control einen Ertrag
+            gutschreiben, den sie nie verdient hat. „Konstant“ bleibt für die Sensitivitätsanalyse.
           </p>
         )}
       </div>

@@ -263,6 +263,17 @@ def assets():
     return {"assets": universe_payload()}
 
 
+def _json_safe(table: list) -> list:
+    """NaN is not valid JSON. Strategies without a separate gross variant (vol-control,
+    true buy-and-hold) legitimately have empty gross fields — emit them as null."""
+    import math
+    for row in table:
+        for k, v in list(row.items()):
+            if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                row[k] = None
+    return table
+
+
 def _limit_flags(table: list, req: RunRequest) -> list:
     """Attach treasury risk-limit breach flags (limits are negative thresholds)."""
     for row in table:
@@ -317,7 +328,7 @@ def backtest(req: RunRequest):
     rets, cfg, rf_info, spec, sample_report, pit = _prepared(req)
     run = run_strategies(rets, cfg, req.crypto_share, pit_builder=pit)
     table = metrics_table(run).reset_index().to_dict(orient="records")
-    table = _limit_flags(table, req)
+    table = _limit_flags(_json_safe(table), req)
     return {
         "crypto_share": req.crypto_share,
         "metrics": table,
@@ -462,14 +473,44 @@ def describe(req: RunRequest):
     between crypto and equities). Correlation and the reported window use the
     ALIGNED complete-case sample, since correlation requires paired observations.
     """
+    scoped, spec, report = _sample_for(req)
+    aligned = scoped if scoped is not None else _returns_for(req)
     native = _prices_raw(req)
-    aligned = _returns_for(req)
-    # Resolve rf the same way the backtest does, so the per-asset Sharpe here and
-    # the strategy Sharpe in /backtest rest on one identical rate definition.
+
+    # Chapter 4.1 must describe the SAME data the backtest analyses. The primary
+    # block is therefore the ACTIVE sample window; the full native history is kept
+    # but clearly labelled separately (it is useful for "since year X" questions).
+    if spec is not None:
+        try:
+            full = _frozen_prices() if req.source != "live" else _live_prices(
+                spec.start, spec.end, req.base_currency)
+            cols = [c for c in report["assets"] if c in full.columns]
+            native = full[cols]
+        except Exception:
+            pass
+    win_prices = native.loc[aligned.index.min():aligned.index.max()]
+
     rf_annual, _rf_series, rf_info = _resolve_rf(req, aligned)
     cfg = _cfg(req, rf_annual=rf_annual)
-    stats = describe_assets(native, cfg.rf_annual, cfg.cvar_alpha)
+    stats = describe_assets(win_prices, cfg.rf_annual, cfg.cvar_alpha)      # sample window
+    stats_full = describe_assets(native, cfg.rf_annual, cfg.cvar_alpha)     # native history
+    y0, y1 = aligned.index.min().year, aligned.index.max().year
+    partial_years = sorted({y for y in (y0, y1)
+                            if not (aligned.index.min() <= pd.Timestamp(f"{y}-01-05")
+                                    and aligned.index.max() >= pd.Timestamp(f"{y}-12-25"))})
     return {
+        "scope": {
+            "basis": "sample_window",
+            "start": str(aligned.index.min().date()),
+            "end": str(aligned.index.max().date()),
+            "observations": int(len(aligned)),
+            "partial_years": partial_years,
+            "note": ("Primärblock = aktives Sample-Fenster (identisch zum Backtest). "
+                     "'assets_full' beschreibt die vollständige verfügbare Historie je Asset "
+                     "und ist NICHT die Datenbasis der Ergebnisse."),
+        },
+        "assets_full": stats_full.round(6).to_dict(orient="records"),
+        "kurtosis_convention": "excess",   # Normalverteilung = 0 (nicht 3)
         "source": req.source,
         "base_currency": req.base_currency,
         "fetched_at": pd.Timestamp.utcnow().isoformat(),

@@ -11,6 +11,15 @@ export interface MetricRow {
   max_drawdown: number;
   cvar_95: number;
   turnover: number;
+  // Strategies can run on DIFFERENT calendars (risk parity drops a warm-up), so
+  // each row carries its own sample size and effective window.
+  observations?: number | null;
+  start?: string | null;
+  end?: string | null;
+  // Gross = before transaction costs, so the cost assumption stays visible.
+  ann_return_gross?: number | null;
+  cagr_gross?: number | null;
+  sharpe_gross?: number | null;
   mdd_breach: boolean;
   cvar_breach: boolean;
 }
@@ -209,7 +218,10 @@ export interface HypothesesResponse {
   H3_dCVaR_mann_kendall: MannKendall;
   H3_dMDD_boot_slope: BootSlope;
   H3_dCVaR_boot_slope: BootSlope;
-  holm_adjusted: Record<string, number>;
+  holm_adjusted: Record<string, number>;           // confirmatory family only
+  holm_adjusted_incl_wilcoxon: Record<string, number>; // documented alternative
+  holm_family: string[];
+  holm_note: string;
   deflated_sharpe: DeflatedSharpe;
   probabilistic_sharpe: { sr: number; psr: number };
   sweep: SweepPoint[];
@@ -324,6 +336,18 @@ export interface AssetStat {
 }
 
 export interface DescribeResponse {
+  /** What the primary block describes — the ACTIVE sample window, not the full history. */
+  scope?: {
+    basis: string;
+    start: string;
+    end: string;
+    observations: number;
+    partial_years: number[];
+    note: string;
+  };
+  /** Full native history per asset — context only, NOT the basis of the results. */
+  assets_full?: AssetStat[];
+  kurtosis_convention?: string;
   source: string;
   base_currency: string;
   fetched_at: string;

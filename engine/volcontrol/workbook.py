@@ -162,11 +162,17 @@ def build_workbook(prices: pd.DataFrame, returns: pd.DataFrame, weights: dict,
     wsp = wb.create_sheet("Portfolio")
     heads = ["Datum", "BH-Rendite", "BH-Wealth", "BH-Peak", "BH-Drawdown",
              "VC-Exposure", "VC-Kosten", "VC-Rendite", "VC-Wealth", "VC-Peak", "VC-Drawdown",
-             "rf (Tag)"]
+             "rf (Tag)", "BH-Kosten"]
     # The risk-free rate varies day by day (€STR/EONIA, negative until mid-2022),
     # so it is written as its OWN column and referenced by the formulas — the
     # examiner can trace every cash-leg cent instead of trusting a hard-coded constant.
     rf_vec = pd.Series(np.asarray(cfg.rf_for(returns.index), dtype=float), index=returns.index)
+    # Buy-and-Hold is a constant-mix: it trades back to target daily and is charged
+    # for it in the engine. The cost therefore has to be visible here too, otherwise
+    # the workbook would no longer reproduce the engine's Buy-and-Hold.
+    from . import strategies as _stg
+    from .backtest import weight_cost as _weight_cost
+    _bh_turn, _bh_cost = _weight_cost(_stg.constant_mix_weight_path(returns, weights), cfg)
     for j, h in enumerate(heads):
         wsp.cell(1, j + 1, h).font = _HEAD
     rlast = _col(na + 1)  # last asset column letter in Renditen
@@ -181,7 +187,8 @@ def build_workbook(prices: pd.DataFrame, returns: pd.DataFrame, weights: dict,
         # mirrors the engine's skipna aggregation and never yields #VALUE!.
         rng = f"Renditen!{_col(g_first)}{rr}:{_col(g_last)}{rr}"
         b = wsp.cell(row, 2)
-        b.value = f"=SUMPRODUCT(IF(ISNUMBER({rng}),{rng},0),Gewichte!$B$2:${last}$2)"
+        b.value = (f"=SUMPRODUCT(IF(ISNUMBER({rng}),{rng},0),"
+                   f"Gewichte!$B$2:${last}$2)-M{row}")
         b.number_format = _PCT
         # Wealth / Peak / Drawdown
         w = wsp.cell(row, 3)
@@ -203,6 +210,9 @@ def build_workbook(prices: pd.DataFrame, returns: pd.DataFrame, weights: dict,
                     else f"=ABS(F{row}-F{row-1})*{cost_bps}/10000")
         co.number_format = _NUM4
         # VC return = e*BH + (1-e)*rf - cost
+        bhc = wsp.cell(row, 13)
+        bhc.value = round(float(_bh_cost.get(d, 0.0)), 10)
+        bhc.number_format = "0.00000000"
         rfc = wsp.cell(row, 12)
         rfc.value = round(float(rf_vec.get(d, 0.0)), 10)
         rfc.number_format = "0.00000000"

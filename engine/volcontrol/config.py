@@ -42,7 +42,17 @@ class EngineConfig:
     bootstrap_n: int = 10_000
     expected_block: int = 20                               # stationary block-bootstrap mean length
     seed: int = 42
-    n_trials: int = 9                                      # configs tried, for the Deflated Sharpe
+
+    # --- the search space the study ACTUALLY explores -----------------------
+    # The Deflated Sharpe must deflate by the number of configurations that were
+    # really tried, not by the handful that end up in the metrics table. These
+    # grids are the single source of truth for the sweep, the stability exhibit
+    # AND the DSR trial set — so the three can never disagree.
+    # (The former `n_trials = 9` constant was unused dead weight and is gone.)
+    stability_lookbacks: Tuple[int, ...] = (20, 40, 60, 90, 120)
+    stability_target_vols: Tuple[float, ...] = (0.05, 0.075, 0.10, 0.125, 0.15)
+    sweep_max_share: float = 0.50
+    sweep_step: float = 0.025
 
     # --- named sub-periods / regimes (for regime analysis) ---
     subperiods: Tuple[Tuple[str, str, str], ...] = (

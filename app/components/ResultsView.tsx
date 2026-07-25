@@ -152,6 +152,7 @@ export default function ResultsView({
 
         <div className="grid lg:grid-cols-[300px_1fr] gap-8">
           <ControlPanel
+            rf={backtest?.rf ?? null}
             params={params}
             onChange={onChange}
             onExportPdf={onExportPdf}

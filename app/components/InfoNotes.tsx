@@ -30,7 +30,7 @@ const REFERENCES: string[] = [
 // Methodological & Controlling context. These are DECISION/DISCUSSION pointers
 // for the written thesis — not computed results — surfaced so the tool and the
 // text stay consistent about assumptions and limitations.
-const NOTES: { title: string; body: string }[] = [
+function buildNotes(negTxt: string | null): { title: string; body: string }[] { return [
   {
     title: "Einordnung ins Corporate Treasury",
     body:
@@ -49,7 +49,9 @@ const NOTES: { title: string; body: string }[] = [
   {
     title: "Risikofreier Zins (tagesgenau, verkettet)",
     body:
-      "Der risikofreie Zins ist KEINE Konstante, sondern die realisierte Tagesreihe: €STR ab 01.10.2019, davor EONIA − 8,5 bp (offizieller EZB-Umstellungsspread; im Überlappungsfenster gilt er auf allen 579 Tagen exakt, die Verkettung ist also bruchfrei). Das ist ergebniskritisch, nicht kosmetisch: Die Vol-Control verzinst ihre nicht investierte Quote mit (1 − Exposure) · rf, und in ~59 % der Tage dieses Fensters war der Zins negativ — gerade in den Stressphasen mit niedrigem Exposure. Eine feste 3-%-Annahme überzeichnet die Vol-Control-Rendite um rund 0,8 Prozentpunkte p. a., während Buy-and-Hold (voll investiert, keine Cash-Quote) unverändert bleibt. Umrechnung p. a. → täglich nach Geldmarktkonvention act/360 über die tatsächlichen Kalendertage. Der Modus 'Konstant' bleibt für die Sensitivitätsanalyse erhalten.",
+      "Der risikofreie Zins ist KEINE Konstante, sondern die realisierte Tagesreihe: €STR ab 01.10.2019, davor EONIA − 8,5 bp (offizieller EZB-Umstellungsspread; im Überlappungsfenster gilt er an jedem Tag exakt, die Verkettung ist also bruchfrei). Das ist ergebniskritisch, nicht kosmetisch: Die Vol-Control verzinst ihre nicht investierte Quote mit (1 − Exposure) · rf, und " +
+      (negTxt ? `in ${negTxt} der Tage des AKTIVEN Fensters` : "in weiten Teilen des Fensters") +
+      " war der Zins negativ — gerade in den Stressphasen mit niedrigem Exposure. Eine feste Konstante würde der Cash-Quote einen Ertrag gutschreiben, den sie nie verdient hat, während Buy-and-Hold (voll investiert, keine Cash-Quote) unberührt bleibt. Umrechnung p. a. → täglich nach Geldmarktkonvention act/360 über die tatsächlichen Kalendertage. Der Modus 'Konstant' bleibt für die Sensitivitätsanalyse erhalten.",
   },
   {
     title: "Untersuchungszeitraum & Reproduzierbarkeit",
@@ -64,9 +66,10 @@ const NOTES: { title: string; body: string }[] = [
   {
     title: "Annualisierung (Kalender)",
     body:
-      "Deskriptive Kennzahlen nutzen den nativen Kalender je Asset (Krypto ~365, Aktien ~252 Tage/Jahr). Der Portfolio-Backtest samplet auf dem gemeinsamen Handelskalender (~252) — bewusste, konsistente Annahme für die tägliche Portfoliobildung.",
+      "Deskriptive Kennzahlen nutzen den nativen Kalender je Asset (Krypto ~365, Aktien ~252 Tage/Jahr; der tatsächliche Wert je Asset steht in der Spalte 'Tage/J'). Der Portfolio-Backtest samplet auf dem gemeinsamen Handelskalender — bewusste, konsistente Annahme für die tägliche Portfoliobildung. Die ausgewiesene Wölbung ist die EXZESS-Kurtosis (Normalverteilung = 0, nicht 3); positive Werte bedeuten fettere Ränder als die Normalverteilung.",
   },
 ];
+}
 
 export default function InfoNotes({
   fingerprint,
@@ -76,6 +79,8 @@ export default function InfoNotes({
   onDownloadDataset,
   downloadingDataset,
 }: Props) {
+  const negShare = rf?.estr?.window_share_negative;
+  const NOTES = buildNotes(negShare != null ? `${(negShare * 100).toFixed(0)} %` : null);
   const s = tradWeights.MSCI_World + tradWeights.Global_Bonds + tradWeights.Gold || 1;
   const split = {
     MSCI_World: tradWeights.MSCI_World / s,

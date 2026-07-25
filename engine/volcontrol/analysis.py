@@ -111,8 +111,8 @@ def param_stability(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
                     pit_builder=None) -> dict:
     """Grid of vol-control Sharpe over (lookback × target vol) — evidence that the
     result is not an artefact of one lucky parameter choice."""
-    lookbacks = lookbacks or [20, 40, 60, 90, 120]
-    target_vols = target_vols or [0.05, 0.075, 0.10, 0.125, 0.15]
+    lookbacks = list(lookbacks or cfg.stability_lookbacks)
+    target_vols = list(target_vols or cfg.stability_target_vols)
     port = _base_port(returns, cfg, crypto_share, pit_builder)
     cost = _blended_cost_bps(crypto_share, cfg)
 

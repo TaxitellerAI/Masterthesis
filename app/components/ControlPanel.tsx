@@ -4,6 +4,7 @@ import type { EngineParams } from "@/lib/types";
 import ParamControls from "./ParamControls";
 
 interface Props {
+  rf?: import("@/lib/types").RfInfo | null;
   params: EngineParams;
   onChange: (next: Partial<EngineParams>) => void;
   onExportPdf: () => void;
@@ -19,6 +20,7 @@ interface Props {
 // selection + data source stay fixed for the session — change them via the
 // configurator), plus PDF export and a way back to the configurator.
 export default function ControlPanel({
+  rf = null,
   params,
   onChange,
   onExportPdf,
@@ -37,7 +39,7 @@ export default function ControlPanel({
         </div>
 
         <div className="px-5 py-5">
-          <ParamControls params={params} onChange={onChange} />
+          <ParamControls params={params} onChange={onChange} rf={rf} />
         </div>
 
         <div className="px-5 py-4 border-t border-hairline space-y-2">
