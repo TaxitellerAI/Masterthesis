@@ -13,16 +13,27 @@ from . import metrics as mt
 from .backtest import run_strategies, portfolio_weights, _blended_cost_bps
 
 
+def _base_port(returns: pd.DataFrame, cfg: EngineConfig, crypto_share: float,
+               pit_builder=None) -> pd.Series:
+    """Base (un-controlled) portfolio — point-in-time sleeve when a builder is given,
+    otherwise the static constant-mix. Keeps every exhibit consistent with /backtest."""
+    if pit_builder is None:
+        return st.buy_and_hold(returns, portfolio_weights(crypto_share, list(returns.columns), cfg))
+    from . import sample as sm
+    W, sleeve_cost, _ = pit_builder(crypto_share, returns.index)
+    return sm.weighted_portfolio(returns, W) - sleeve_cost
+
+
 def _stride(n: int, cap: int = 400) -> int:
     """Downsample stride so a series returns at most ~`cap` points."""
     return max(1, n // cap)
 
 
 def time_series(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
-                crypto_share: float = 0.10, target_vol: float = 0.10) -> dict:
+                crypto_share: float = 0.10, target_vol: float = 0.10, pit_builder=None) -> dict:
     """Wealth, drawdown and exposure paths for Buy-and-Hold, the selected
     vol-control variant and the benchmarks, rebased to 1 at a common start."""
-    run = run_strategies(returns, cfg, crypto_share)
+    run = run_strategies(returns, cfg, crypto_share, pit_builder)
     key = f"VolControl_{int(target_vol * 100)}"
     names = [n for n in ["BuyHold", key, "Benchmark_TrueBH", "Benchmark_6040", "Benchmark_RiskParity"]
              if n in run["strategies"]]
@@ -68,10 +79,10 @@ def time_series(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
 
 
 def subperiod_metrics(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
-                      crypto_share: float = 0.10, target_vol: float = 0.10) -> list:
+                      crypto_share: float = 0.10, target_vol: float = 0.10, pit_builder=None) -> list:
     """Metrics for Buy-and-Hold vs. the selected vol-control variant within each
     named regime — the crisis-period evidence that risk management must show."""
-    run = run_strategies(returns, cfg, crypto_share)
+    run = run_strategies(returns, cfg, crypto_share, pit_builder)
     bh = run["strategies"]["BuyHold"]["returns"]
     vc = run["strategies"][f"VolControl_{int(target_vol * 100)}"]["returns"]
 
@@ -96,12 +107,13 @@ def subperiod_metrics(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
 
 
 def param_stability(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
-                    crypto_share: float = 0.10, lookbacks=None, target_vols=None) -> dict:
+                    crypto_share: float = 0.10, lookbacks=None, target_vols=None,
+                    pit_builder=None) -> dict:
     """Grid of vol-control Sharpe over (lookback × target vol) — evidence that the
     result is not an artefact of one lucky parameter choice."""
     lookbacks = lookbacks or [20, 40, 60, 90, 120]
     target_vols = target_vols or [0.05, 0.075, 0.10, 0.125, 0.15]
-    port = st.buy_and_hold(returns, portfolio_weights(crypto_share, list(returns.columns), cfg))
+    port = _base_port(returns, cfg, crypto_share, pit_builder)
     cost = _blended_cost_bps(crypto_share, cfg)
 
     grid = []
@@ -119,7 +131,8 @@ def param_stability(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
 
 
 def walk_forward(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
-                 crypto_share: float = 0.10, n_folds: int = 5, train_frac: float = 0.4) -> dict:
+                 crypto_share: float = 0.10, n_folds: int = 5, train_frac: float = 0.4,
+                 pit_builder=None) -> dict:
     """Walk-forward out-of-sample test.
 
     The target volatility is a free parameter — this shows the strategy is not
@@ -127,7 +140,7 @@ def walk_forward(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
     in-sample Sharpe, then measure it purely out-of-sample. Concatenating the OOS
     segments gives an honest, selection-aware equity curve.
     """
-    port = st.buy_and_hold(returns, portfolio_weights(crypto_share, list(returns.columns), cfg))
+    port = _base_port(returns, cfg, crypto_share, pit_builder)
     cost = _blended_cost_bps(crypto_share, cfg)
 
     # Precompute each candidate strategy once over the full sample.
@@ -191,10 +204,11 @@ def walk_forward(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
 
 
 def rolling_metrics(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
-                    crypto_share: float = 0.10, target_vol: float = 0.10, window: int = 126) -> dict:
+                    crypto_share: float = 0.10, target_vol: float = 0.10, window: int = 126,
+                    pit_builder=None) -> dict:
     """Rolling annualised Sharpe for Buy-and-Hold vs. the selected vol-control —
     shows whether the edge is stable over time or driven by one episode."""
-    run = run_strategies(returns, cfg, crypto_share)
+    run = run_strategies(returns, cfg, crypto_share, pit_builder)
     bh = run["strategies"]["BuyHold"]["returns"]
     vc = run["strategies"][f"VolControl_{int(target_vol * 100)}"]["returns"]
 
@@ -223,10 +237,11 @@ def rolling_metrics(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
 
 
 def return_distribution(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
-                        crypto_share: float = 0.10, target_vol: float = 0.10, bins: int = 41) -> dict:
+                        crypto_share: float = 0.10, target_vol: float = 0.10, bins: int = 41,
+                        pit_builder=None) -> dict:
     """Histogram of daily returns for Buy-and-Hold vs. the selected vol-control,
     with VaR/CVaR markers — the tail-risk story made visual."""
-    run = run_strategies(returns, cfg, crypto_share)
+    run = run_strategies(returns, cfg, crypto_share, pit_builder)
     bh = run["strategies"]["BuyHold"]["returns"].values
     vc = run["strategies"][f"VolControl_{int(target_vol * 100)}"]["returns"].values
 
@@ -249,10 +264,10 @@ def return_distribution(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(
 
 
 def monthly_returns(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
-                    crypto_share: float = 0.10, target_vol: float = 0.10) -> dict:
+                    crypto_share: float = 0.10, target_vol: float = 0.10, pit_builder=None) -> dict:
     """Calendar of monthly compounded returns for the selected vol-control
     strategy (year × month heatmap) plus the annual total."""
-    run = run_strategies(returns, cfg, crypto_share)
+    run = run_strategies(returns, cfg, crypto_share, pit_builder)
     vc = run["strategies"][f"VolControl_{int(target_vol * 100)}"]["returns"]
     grp = (1 + vc).groupby([vc.index.year, vc.index.month]).prod() - 1
     years = sorted({y for y, _ in grp.index})
@@ -309,10 +324,11 @@ def _drawdown_episodes(series: pd.Series, top: int = 5) -> list:
 
 
 def drawdown_table(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
-                   crypto_share: float = 0.10, target_vol: float = 0.10, top: int = 5) -> dict:
+                   crypto_share: float = 0.10, target_vol: float = 0.10, top: int = 5,
+                   pit_builder=None) -> dict:
     """Worst drawdown episodes for Buy-and-Hold vs. the selected vol-control —
     the concrete crisis-by-crisis evidence behind the aggregate max-drawdown."""
-    run = run_strategies(returns, cfg, crypto_share)
+    run = run_strategies(returns, cfg, crypto_share, pit_builder)
     bh = run["strategies"]["BuyHold"]["returns"]
     vc = run["strategies"][f"VolControl_{int(target_vol * 100)}"]["returns"]
     return {
@@ -355,11 +371,11 @@ def rolling_correlation(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(
 
 def cost_sensitivity(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
                      crypto_share: float = 0.10, target_vol: float = 0.10,
-                     multipliers=None) -> dict:
+                     multipliers=None, pit_builder=None) -> dict:
     """Net Sharpe / CAGR of the vol-control strategy as transaction costs scale —
     does the edge survive higher (more realistic) crypto trading costs?"""
     multipliers = multipliers or [0.0, 0.5, 1.0, 1.5, 2.0, 3.0]
-    port = st.buy_and_hold(returns, portfolio_weights(crypto_share, list(returns.columns), cfg))
+    port = _base_port(returns, cfg, crypto_share, pit_builder)
     base = _blended_cost_bps(crypto_share, cfg)
 
     points = []

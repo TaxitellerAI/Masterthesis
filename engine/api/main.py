@@ -29,6 +29,7 @@ from volcontrol import (
     build_workbook,
 )
 from volcontrol.backtest import portfolio_weights, _blended_cost_bps
+from volcontrol import sample as sm
 
 app = FastAPI(title="Volatility-Control Treasury Engine", version="0.2.0")
 app.add_middleware(
@@ -53,6 +54,10 @@ class RunRequest(BaseModel):
     # different data set on every call and make the reported figures irreproducible.
     start: str = STUDY_START
     end: str = STUDY_END
+    # Named sample design (volcontrol/sample.py). "custom" keeps the explicit
+    # assets/start/end selection; S1..S3 and S4_<year> drive window, crypto members
+    # and sleeve mode from the spec instead.
+    scenario: str = "custom"
     # --- robustness levers ---
     vol_method: str = "rolling"            # "rolling" | "ewma"
     rebalance: str = "daily"               # "daily" | "weekly" | "monthly"
@@ -128,6 +133,40 @@ def _prices_raw(req: RunRequest) -> pd.DataFrame:
             raise HTTPException(status_code=422,
                                 detail=f"Keine Kurse im Fenster {req.start}..{req.end}.")
     return prices
+
+
+def _spec_for(req: RunRequest):
+    """The active SampleSpec, or None when the request drives assets/window itself."""
+    if not req.scenario or req.scenario == "custom":
+        return None
+    return sm.get_spec(req.scenario)
+
+
+def _sample_for(req: RunRequest):
+    """(returns, spec, report) for a named scenario — the scenario defines window,
+    crypto members and sleeve mode, so it overrides assets/start/end."""
+    spec = _spec_for(req)
+    if spec is None:
+        return None, None, None
+    try:
+        prices = _frozen_prices() if req.source != "live" else _live_prices(
+            spec.start, spec.end, req.base_currency)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Datenquelle nicht verfügbar: {e}")
+    kept, report = sm.resolve_sample(prices, spec)
+    rets = simple_returns(kept)
+    if rets.empty:
+        raise HTTPException(status_code=422, detail=f"{spec.name}: leeres Sample.")
+    return rets, spec, report
+
+
+def _pit_builder_for(req: RunRequest, spec, cfg, columns):
+    """Point-in-time weight builder, or None for a fixed basket."""
+    if spec is None or not spec.is_pit:
+        return None
+    prices = _frozen_prices() if req.source != "live" else _live_prices(
+        spec.start, spec.end, req.base_currency)
+    return sm.make_pit_builder(spec, prices, cfg, columns)
 
 
 def _returns_for(req: RunRequest) -> pd.DataFrame:
@@ -233,50 +272,68 @@ def _limit_flags(table: list, req: RunRequest) -> list:
 def _run_spec(req: RunRequest) -> dict:
     """The choices that DEFINE a run — hashed into the fingerprint so a citable
     result can never be confused with one from a different window or rf mode."""
-    return {
+    spec = _spec_for(req)
+    out = {
         "source": req.source,
-        "window_start": req.start,
-        "window_end": req.end,
+        "window_start": spec.start if spec else req.start,
+        "window_end": spec.end if spec else req.end,
         "rf_mode": _rf_mode(req),
         "base_currency": req.base_currency.upper(),
+        "scenario": spec.name if spec else "custom",
+        "sleeve_mode": spec.sleeve_mode if spec else "fixed",
     }
+    return out
+
+
+def _spec_with_effective(req: RunRequest, report: Optional[dict]) -> dict:
+    """Run spec for the fingerprint, enriched with the sample that actually resolved."""
+    out = _run_spec(req)
+    if report:
+        out["effective_start"] = report["effective_start"]
+        out["effective_end"] = report["effective_end"]
+        out["n_rows"] = report["n_rows"]
+    return out
 
 
 def _prepared(req: RunRequest, **cfg_overrides):
     """Returns (returns_matrix, cfg, rf_info) with the risk-free rate resolved —
     the one place where the realised rf series replaces the flat constant."""
-    rets = _returns_for(req)
+    scoped, spec, report = _sample_for(req)
+    rets = scoped if scoped is not None else _returns_for(req)
     rf_annual, rf_series, rf_info = _resolve_rf(req, rets)
     cfg = _cfg(req, rf_annual=rf_annual, rf_series=rf_series, **cfg_overrides)
-    return rets, cfg, rf_info
+    pit = _pit_builder_for(req, spec, cfg, list(rets.columns))
+    return rets, cfg, rf_info, spec, report, pit
 
 
 @app.post("/backtest")
 def backtest(req: RunRequest):
-    rets, cfg, rf_info = _prepared(req)
-    run = run_strategies(rets, cfg, req.crypto_share)
+    rets, cfg, rf_info, spec, sample_report, pit = _prepared(req)
+    run = run_strategies(rets, cfg, req.crypto_share, pit_builder=pit)
     table = metrics_table(run).reset_index().to_dict(orient="records")
     table = _limit_flags(table, req)
     return {
         "crypto_share": req.crypto_share,
         "metrics": table,
+        "sample": sample_report,
+        "sleeve": run.get("sleeve"),
         "limits": {"mdd_limit": req.mdd_limit, "cvar_limit": req.cvar_limit},
-        "fingerprint": fingerprint(rets, _run_spec(req)),
+        "fingerprint": fingerprint(rets, _spec_with_effective(req, sample_report)),
         "rf": {"mode": _rf_mode(req), "effective_annual": cfg.rf_annual, "estr": rf_info},
     }
 
 
 @app.post("/sweep")
 def sweep(req: RunRequest):
-    rets, cfg, _ = _prepared(req)
-    df = crypto_sweep(rets, cfg, req.target_vol)
+    rets, cfg, _, spec, sample_report, pit = _prepared(req)
+    df = crypto_sweep(rets, cfg, req.target_vol, pit_builder=pit)
     return {"target_vol": req.target_vol, "points": df.round(5).to_dict(orient="records")}
 
 
 @app.post("/hypotheses")
 def hypotheses(req: RunRequest):
-    rets, cfg, _ = _prepared(req, bootstrap_n=1200)   # smaller default for API latency (free-tier CPU)
-    res = hypothesis_tests(rets, cfg, req.crypto_share, req.target_vol)
+    rets, cfg, _, spec, sample_report, pit = _prepared(req, bootstrap_n=1200)   # smaller default for API latency (free-tier CPU)
+    res = hypothesis_tests(rets, cfg, req.crypto_share, req.target_vol, pit_builder=pit)
     res = {k: (v if k != "sweep" else v.round(5).to_dict(orient="records"))
            for k, v in res.items()}
     return res
@@ -285,19 +342,21 @@ def hypotheses(req: RunRequest):
 @app.post("/timeseries")
 def timeseries(req: RunRequest):
     """Wealth, drawdown and exposure paths for the charts."""
-    rets, cfg, _ = _prepared(req)
-    return time_series(rets, cfg, req.crypto_share, req.target_vol)
+    rets, cfg, _, spec, sample_report, pit = _prepared(req)
+    return time_series(rets, cfg, req.crypto_share, req.target_vol, pit_builder=pit)
 
 
 @app.post("/robustness")
 def robustness(req: RunRequest):
     """Parameter-stability grid, cost sensitivity, regime breakdown, walk-forward OOS."""
-    rets, cfg, _ = _prepared(req)
+    rets, cfg, _, spec, sample_report, pit = _prepared(req)
     return {
-        "param_stability": param_stability(rets, cfg, req.crypto_share),
-        "cost_sensitivity": cost_sensitivity(rets, cfg, req.crypto_share, req.target_vol),
-        "subperiods": subperiod_metrics(rets, cfg, req.crypto_share, req.target_vol),
-        "walk_forward": walk_forward(rets, cfg, req.crypto_share),
+        "param_stability": param_stability(rets, cfg, req.crypto_share, pit_builder=pit),
+        "cost_sensitivity": cost_sensitivity(rets, cfg, req.crypto_share, req.target_vol,
+                                             pit_builder=pit),
+        "subperiods": subperiod_metrics(rets, cfg, req.crypto_share, req.target_vol,
+                                        pit_builder=pit),
+        "walk_forward": walk_forward(rets, cfg, req.crypto_share, pit_builder=pit),
     }
 
 
@@ -322,12 +381,13 @@ def dataset(req: RunRequest):
 @app.post("/analytics")
 def analytics(req: RunRequest):
     """Rolling Sharpe, return distribution and the monthly-returns calendar."""
-    rets, cfg, _ = _prepared(req)
+    rets, cfg, _, spec, sample_report, pit = _prepared(req)
     return {
-        "rolling": rolling_metrics(rets, cfg, req.crypto_share, req.target_vol),
-        "distribution": return_distribution(rets, cfg, req.crypto_share, req.target_vol),
-        "monthly": monthly_returns(rets, cfg, req.crypto_share, req.target_vol),
-        "drawdowns": drawdown_table(rets, cfg, req.crypto_share, req.target_vol),
+        "rolling": rolling_metrics(rets, cfg, req.crypto_share, req.target_vol, pit_builder=pit),
+        "distribution": return_distribution(rets, cfg, req.crypto_share, req.target_vol,
+                                            pit_builder=pit),
+        "monthly": monthly_returns(rets, cfg, req.crypto_share, req.target_vol, pit_builder=pit),
+        "drawdowns": drawdown_table(rets, cfg, req.crypto_share, req.target_vol, pit_builder=pit),
         "correlation": rolling_correlation(rets, cfg),
     }
 
@@ -336,12 +396,12 @@ def analytics(req: RunRequest):
 def workbook(req: RunRequest):
     """Transparency workbook (.xlsx): raw prices + every value as a live Excel
     formula, so the examiner can reproduce each number by hand."""
-    rets, cfg, rf_info = _prepared(req)
+    rets, cfg, rf_info, spec, sample_report, pit = _prepared(req)
     prices = _prices_raw(req)
     if req.source in ("live", "frozen"):
         prices = prices.dropna()                 # aligned prices that rets came from
 
-    run = run_strategies(rets, cfg, req.crypto_share)
+    run = run_strategies(rets, cfg, req.crypto_share, pit_builder=pit)
     key = f"VolControl_{int(req.target_vol * 100)}"
     if key not in run["strategies"]:
         raise HTTPException(status_code=400, detail="Zielvolatilität nicht verfügbar.")
@@ -353,11 +413,15 @@ def workbook(req: RunRequest):
     hyp_cfg = EngineConfig(**{**cfg.__dict__, "bootstrap_n": 1200})
     extras = {
         "describe": stats.round(6).to_dict(orient="records"),
-        "sweep": crypto_sweep(rets, cfg, req.target_vol).round(6).to_dict(orient="records"),
-        "subperiods": subperiod_metrics(rets, cfg, req.crypto_share, req.target_vol),
-        "walk_forward_folds": walk_forward(rets, cfg, req.crypto_share).get("folds", []),
+        "sweep": crypto_sweep(rets, cfg, req.target_vol,
+                              pit_builder=pit).round(6).to_dict(orient="records"),
+        "subperiods": subperiod_metrics(rets, cfg, req.crypto_share, req.target_vol,
+                                        pit_builder=pit),
+        "walk_forward_folds": walk_forward(rets, cfg, req.crypto_share,
+                                           pit_builder=pit).get("folds", []),
         "hypotheses": {k: v for k, v in
-                       hypothesis_tests(rets, hyp_cfg, req.crypto_share, req.target_vol).items()
+                       hypothesis_tests(rets, hyp_cfg, req.crypto_share, req.target_vol,
+                                        pit_builder=pit).items()
                        if k != "sweep"},
     }
     tw = dict(cfg.traditional_weights)

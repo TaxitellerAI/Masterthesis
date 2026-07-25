@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from .config import EngineConfig
+from . import sample as sm
 from . import strategies as st
 from . import metrics as mt
 from . import stats as stx
@@ -36,11 +37,22 @@ def _blended_cost_bps(crypto_share: float, cfg: EngineConfig) -> float:
 
 
 def run_strategies(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
-                   crypto_share: float = 0.10) -> dict:
+                   crypto_share: float = 0.10, pit_builder=None) -> dict:
+    """`pit_builder` (optional) switches the BASE portfolio to a point-in-time sleeve
+    whose composition grows as coins become investable. When it is None the original
+    static path runs completely unchanged — that equivalence is covered by a test."""
     available = list(returns.columns)
-    weights = portfolio_weights(crypto_share, available, cfg)
-    port = st.buy_and_hold(returns, weights)
     cost_bps = _blended_cost_bps(crypto_share, cfg)
+    sleeve_info = None
+    if pit_builder is None:
+        weights = portfolio_weights(crypto_share, available, cfg)
+        port = st.buy_and_hold(returns, weights)
+    else:
+        W, sleeve_cost, sleeve_info = pit_builder(crypto_share, returns.index)
+        # Re-spreading the sleeve when a coin enters is a REAL trade and is charged
+        # at the crypto cost — otherwise the growing basket would look free.
+        port = sm.weighted_portfolio(returns, W) - sleeve_cost
+        weights = {c: round(float(W[c].iloc[-1]), 6) for c in W.columns}
 
     def _summ(series):
         # rf is aligned to each strategy's OWN calendar (they differ in length
@@ -49,6 +61,8 @@ def run_strategies(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
                           cfg.trading_days, cfg.cvar_alpha)
 
     out = {"weights": weights, "crypto_share": crypto_share, "strategies": {}}
+    if sleeve_info is not None:
+        out["sleeve"] = sleeve_info
     out["strategies"]["BuyHold"] = {"returns": port, "turnover": 0.0, **_summ(port)}
 
     for tv in cfg.target_vols:
@@ -67,8 +81,9 @@ def run_strategies(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
     # --- comparators ---
     # True buy-and-hold (drift, zero turnover) — the honest low-turnover baseline
     # next to the daily-rebalanced constant-mix used as the vol-control base.
-    tbh = st.true_buy_and_hold(returns, weights)
-    out["strategies"]["Benchmark_TrueBH"] = {"returns": tbh, "turnover": 0.0, **_summ(tbh)}
+    if pit_builder is None:      # a drifting basket is undefined when members enter later
+        tbh = st.true_buy_and_hold(returns, weights)
+        out["strategies"]["Benchmark_TrueBH"] = {"returns": tbh, "turnover": 0.0, **_summ(tbh)}
 
     if "MSCI_World" in available and "Global_Bonds" in available:
         p6040 = st.buy_and_hold(returns, {"MSCI_World": 0.6, "Global_Bonds": 0.4})
@@ -101,14 +116,18 @@ def metrics_table(run_result: dict) -> pd.DataFrame:
 
 
 def crypto_sweep(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
-                 target_vol: float = 0.10, shares=None) -> pd.DataFrame:
+                 target_vol: float = 0.10, shares=None, pit_builder=None) -> pd.DataFrame:
     """Vary the crypto allocation 0..50% and record the vol-control effect sizes."""
     if shares is None:
         shares = np.round(np.arange(0.0, 0.5001, 0.025), 4)
     rows = []
     for s in shares:
-        weights = portfolio_weights(float(s), list(returns.columns), cfg)
-        port = st.buy_and_hold(returns, weights)
+        if pit_builder is None:
+            weights = portfolio_weights(float(s), list(returns.columns), cfg)
+            port = st.buy_and_hold(returns, weights)
+        else:
+            W, sleeve_cost, _ = pit_builder(float(s), returns.index)
+            port = sm.weighted_portfolio(returns, W) - sleeve_cost
         bh = mt.summary(port.values, cfg.rf_for(port.index), cfg.trading_days, cfg.cvar_alpha)
         strat, _ = st.vol_control(
             port, target_vol, cfg.lookback, cfg.rf_for(port.index), cfg.trading_days,
@@ -127,9 +146,10 @@ def crypto_sweep(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
 
 
 def hypothesis_tests(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
-                     crypto_share: float = 0.10, target_vol: float = 0.10) -> dict:
+                     crypto_share: float = 0.10, target_vol: float = 0.10,
+                     pit_builder=None) -> dict:
     """H1 (MDD), H2 (Sharpe) via paired bootstrap; H3 (interaction) via HAC slope."""
-    run = run_strategies(returns, cfg, crypto_share)
+    run = run_strategies(returns, cfg, crypto_share, pit_builder)
     bh = run["strategies"]["BuyHold"]["returns"].values
     vc = run["strategies"][f"VolControl_{int(target_vol*100)}"]["returns"].values
 
@@ -149,7 +169,7 @@ def hypothesis_tests(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
         cfg.bootstrap_n, cfg.expected_block, cfg.seed)
     wilcox = stx.wilcoxon_test(vc, bh)
 
-    sweep = crypto_sweep(returns, cfg, target_vol)
+    sweep = crypto_sweep(returns, cfg, target_vol, pit_builder=pit_builder)
     shares = sweep["crypto_share"].values
     h3_mdd = stx.hac_ols(shares, sweep["d_mdd"].values)
     h3_cvar = stx.hac_ols(shares, sweep["d_cvar"].values)

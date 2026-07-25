@@ -191,6 +191,94 @@ def test_study_window_is_fixed_calendar():
     assert "start=start" in code and "end=end_excl" in code
 
 
+# ── Sample design (S1..S4, point-in-time sleeve) ─────────────────────────────
+_FROZEN = os.path.join(os.path.dirname(__file__), "..", "data", "frozen_prices_eur.csv")
+
+
+def _frozen():
+    return load_prices(_FROZEN)
+
+
+def test_pit_weight_zero_before_entry():
+    """No look-ahead: a coin's weight must be EXACTLY 0 before its entry date."""
+    from volcontrol import sample as sm
+    from volcontrol.config import EngineConfig
+    prices = _frozen()
+    kept, _ = sm.resolve_sample(prices, sm.S2)
+    rets = simple_returns(kept)
+    W = sm.pit_weight_matrix(rets.index, sm.S2, prices, 0.10,
+                             EngineConfig().traditional_weights, kept.columns)
+    entries = sm.entry_dates(prices, sm.S2.crypto_members, sm.S2.listing_buffer_days)
+    for coin, entry in entries.items():
+        before = W.loc[W.index < entry, coin]
+        assert (before == 0.0).all(), f"{coin} hat Gewicht vor {entry.date()}"
+
+
+def test_pit_weights_sum_to_one():
+    """Every row of the weight matrix must sum to 1 (tolerance 1e-9)."""
+    from volcontrol import sample as sm
+    from volcontrol.config import EngineConfig
+    prices = _frozen()
+    kept, _ = sm.resolve_sample(prices, sm.S2)
+    rets = simple_returns(kept)
+    W = sm.pit_weight_matrix(rets.index, sm.S2, prices, 0.10,
+                             EngineConfig().traditional_weights, kept.columns)
+    assert float((W.sum(axis=1) - 1.0).abs().max()) < 1e-9
+
+
+def test_s1_fixed_matches_static_path_exactly():
+    """Regression guard: S1 (fixed) must reproduce the untouched static path."""
+    from volcontrol import sample as sm
+    from volcontrol.config import EngineConfig
+    from volcontrol.backtest import run_strategies, metrics_table
+    prices = _frozen()
+    kept, _ = sm.resolve_sample(prices, sm.S1)
+    rets = simple_returns(kept)
+    cfg = EngineConfig(rf_mode="constant")
+    old = metrics_table(run_strategies(rets, cfg, 0.10))
+    new = metrics_table(run_strategies(rets, cfg, 0.10, pit_builder=None))
+    assert old.equals(new)
+    assert float((old - new).abs().max().max()) == 0.0
+
+
+def test_s1_effective_sample_bounds():
+    """S1 must resolve to the first trading day of 2018 through 2025-12-31."""
+    from volcontrol import sample as sm
+    _, rep = sm.resolve_sample(_frozen(), sm.S1)
+    assert rep["effective_start"].startswith("2018-01")
+    assert rep["effective_end"] == "2025-12-31"
+    assert rep["n_rows"] > 1900
+
+
+def test_pit_row_not_killed_by_unlisted_coin():
+    """A coin that is not yet listed must NOT drop a row (that was the whole point)."""
+    from volcontrol import sample as sm
+    prices = _frozen()
+    _, s2 = sm.resolve_sample(prices, sm.S2)
+    _, s1 = sm.resolve_sample(prices, sm.S1)
+    # S2 includes Solana yet still starts in 2015 and keeps far more rows than the
+    # fixed basket would if SOL were required throughout.
+    assert "Solana" in s2["crypto_members"]
+    assert s2["effective_start"] < s1["effective_start"]
+    assert s2["n_rows"] > s1["n_rows"]
+
+
+def test_sleeve_entry_is_charged():
+    """Adding a coin re-spreads the sleeve — that trade must cost something."""
+    from volcontrol import sample as sm
+    from volcontrol.config import EngineConfig
+    cfg = EngineConfig()
+    prices = _frozen()
+    kept, _ = sm.resolve_sample(prices, sm.S2)
+    rets = simple_returns(kept)
+    W = sm.pit_weight_matrix(rets.index, sm.S2, prices, 0.10,
+                             cfg.traditional_weights, kept.columns)
+    cost, info = sm.sleeve_rebalance_cost(W, sm.S2.crypto_members, cfg.cost_crypto_bps)
+    assert info["events"] >= 2          # ETH/XRP/BNB enter, later SOL
+    assert info["total_cost"] > 0.0
+    assert cost.sum() > 0.0
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:
