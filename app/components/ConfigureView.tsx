@@ -76,9 +76,9 @@ export default function ConfigureView({
           <section className="border border-hairline bg-paper p-6 card-hover">
             <DataSourcePicker
               source={params.source}
-              years={params.years}
+              start={params.start}
+              end={params.end}
               onSource={(source) => onChange({ source })}
-              onYears={(years) => onChange({ years })}
             />
           </section>
 

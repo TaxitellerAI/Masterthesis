@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
   // ── Parameter block ─────────────────────────────────────────────────────────
   const p = snapshot.params;
   const rfEff = snapshot.backtest?.rf?.effective_annual ?? p.rf_annual;
-  const rfTag = snapshot.backtest?.rf?.mode === "estr" ? " (ESTR Ø, ECB)" : "";
+  const rfTag = snapshot.backtest?.rf?.mode === "estr_chained" ? " (ESTR/EONIA real, \u00d8)" : " (konstant)";
   const params: [string, string][] = [
     ["Krypto-Quote", pct(p.crypto_share, 1)],
     ["Zielvolatilität", pct(p.target_vol, 0)],

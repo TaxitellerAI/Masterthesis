@@ -4,25 +4,32 @@ import type { EngineParams } from "@/lib/types";
 
 interface Props {
   source: EngineParams["source"];
-  years: number;
+  start: string;
+  end: string;
   onSource: (s: EngineParams["source"]) => void;
-  onYears: (y: number) => void;
 }
 
-const YEAR_OPTIONS = [3, 5, 8, 10];
-
-// Data source for the run: instant synthetic fixture vs. a live Yahoo Finance
-// pull (current quotes, fetched fresh per configurator run, EUR-converted).
-export default function DataSourcePicker({ source, years, onSource, onYears }: Props) {
+// Data source for the run. The default is the FROZEN snapshot: the reported
+// thesis figures must not move because Yahoo Finance revised a price or the
+// defence happens to run on a day with a rate limit. Live stays available to
+// show the tool works against current quotes.
+export default function DataSourcePicker({ source, start, end, onSource }: Props) {
   return (
     <div>
       <span className="eyebrow">Datenquelle</span>
-      <div className="grid sm:grid-cols-3 gap-3 mt-3">
+      <div className="grid sm:grid-cols-2 gap-3 mt-3">
         {(
           [
-            { id: "synthetic", title: "Synthetisch", desc: "Reproduzierbare Fixture-Daten, sofort verfügbar." },
-            { id: "frozen", title: "Eingefroren · real", desc: "Fixierter Marktdaten-Abzug (EUR), zitierfähig & stabil." },
-            { id: "live", title: "Live · Yahoo Finance", desc: "Aktuelle Kurse, bei jedem Lauf neu gezogen." },
+            {
+              id: "frozen",
+              title: "Eingefroren · real",
+              desc: "Fixierter Marktdaten-Abzug (EUR). Zitierfähig, reproduzierbar, netzunabhängig.",
+            },
+            {
+              id: "live",
+              title: "Live · Yahoo Finance",
+              desc: "Aktuelle Kurse im selben Fenster — zeigt, dass das Werkzeug live läuft.",
+            },
           ] as const
         ).map((opt) => {
           const active = source === opt.id;
@@ -53,29 +60,18 @@ export default function DataSourcePicker({ source, years, onSource, onYears }: P
         })}
       </div>
 
-      {/* History length — only meaningful for the live pull. */}
-      <div className={`mt-4 transition-opacity ${source === "live" ? "" : "opacity-40 pointer-events-none"}`}>
-        <div className="flex items-baseline justify-between mb-2">
-          <label className="text-sm font-medium">Historie</label>
-          <span className="text-faint text-xs">Live-Fenster wird durch jüngstes Asset begrenzt</span>
+      {/* Fixed study window — stated, not choosable, because it defines the result. */}
+      <div className="mt-4 border border-hairline bg-panel px-4 py-3">
+        <div className="flex items-baseline justify-between gap-4">
+          <span className="eyebrow">Untersuchungszeitraum</span>
+          <span className="text-sm nums tabular-nums">
+            {start} — {end}
+          </span>
         </div>
-        <div className="inline-flex border border-hairline-strong">
-          {YEAR_OPTIONS.map((y) => {
-            const active = years === y;
-            return (
-              <button
-                key={y}
-                onClick={() => onYears(y)}
-                className={`px-4 py-1.5 text-sm nums border-l first:border-l-0 border-hairline-strong transition-colors ${
-                  active ? "bg-ink text-paper" : "text-muted hover:text-ink"
-                }`}
-                aria-pressed={active}
-              >
-                {y} J
-              </button>
-            );
-          })}
-        </div>
+        <p className="text-faint text-xs mt-1.5 leading-snug">
+          Feste Kalendergrenzen (acht volle Jahre) statt eines rollierenden Fensters — sonst
+          lieferte jeder Abruf einen anderen Datenstand und kein Ergebnis wäre zitierfähig.
+        </p>
       </div>
     </div>
   );

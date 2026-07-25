@@ -5,7 +5,7 @@ thesis can be driven from one identical parameter set (reproducibility).
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Tuple
+from typing import Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -23,7 +23,16 @@ class EngineConfig:
     dead_band: float = 0.0                                 # exposure no-trade zone (0 = off)
 
     # --- market / cost assumptions ---
-    rf_annual: float = 0.03                                # risk-free p.a. (3M-EURIBOR proxy)
+    # The risk-free rate is NOT a cosmetic input here: vol_control remunerates the
+    # un-invested share with (1 - exposure) * rf. Default is the realised, chained
+    # daily €STR/EONIA series (see data.fetch_rf_chained); rf_annual survives as the
+    # constant fallback for the sensitivity analysis ("what if we had assumed 3 %").
+    rf_mode: str = "estr_chained"                          # "estr_chained" | "constant"
+    rf_annual: float = 0.03                                # constant fallback, p.a.
+    rf_convention: str = "act360"                          # "act360" (market) | "simple_252"
+    # Realised annualised rf series (DatetimeIndex). Injected by the data layer;
+    # compare=False so two configs stay comparable and hashable-by-value elsewhere.
+    rf_series: Optional[object] = field(default=None, compare=False, repr=False)
     base_currency: str = "EUR"                             # "EUR" matches thesis, "USD" for demo
     cost_traditional_bps: float = 10.0                     # transaction cost, traditional assets
     cost_crypto_bps: float = 25.0                          # transaction cost, crypto
@@ -57,4 +66,19 @@ class EngineConfig:
 
     @property
     def rf_daily(self) -> float:
+        """Constant per-day risk-free rate (fallback / legacy scalar path)."""
         return self.rf_annual / self.trading_days
+
+    def rf_for(self, index):
+        """Per-period risk-free accrual aligned to a specific return series.
+
+        Returns a numpy array when a realised rf series is configured, otherwise
+        the constant scalar — so every metric and strategy consumes the SAME rate
+        definition without any call site having to know which mode is active.
+        """
+        if self.rf_mode != "estr_chained" or self.rf_series is None:
+            return self.rf_daily
+        from .data import rf_daily_series
+        return rf_daily_series(
+            self.rf_series, index, self.rf_convention, self.trading_days
+        ).to_numpy()

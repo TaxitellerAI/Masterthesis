@@ -21,19 +21,31 @@ export interface Fingerprint {
   columns: string[];
   start: string | null;
   end: string | null;
+  // Run-defining choices hashed INTO the fingerprint (engine: data.fingerprint).
+  source?: string;
+  window_start?: string;
+  window_end?: string;
+  rf_mode?: string;
+  base_currency?: string;
 }
 
 export interface RfInfo {
-  mode: "manual" | "estr";
+  mode: "estr_chained" | "constant";
   effective_annual: number;
   estr: {
-    mean_annual?: number;
-    min_annual?: number;
-    max_annual?: number;
+    source?: string;
+    splice_date?: string;
+    spread_bps?: number;
+    observations?: number;
     first?: string;
     last?: string;
-    observations?: number;
-    source?: string;
+    frozen?: boolean;
+    convention?: string;
+    window_mean_annual?: number;
+    window_min_annual?: number;
+    window_max_annual?: number;
+    window_share_negative?: number;
+    rf_annual?: number;
     error?: string;
   } | null;
 }
@@ -204,13 +216,17 @@ export interface EngineParams {
   rf_annual: number;
   // Data selection (added with the configurator / live data).
   assets: string[]; // canonical names to include
-  source: "synthetic" | "live" | "frozen";
-  years: number; // history length for the live Yahoo Finance pull
+  source: "frozen" | "live";
+  // Explicit calendar window — never a rolling "last N years", so a cited result
+  // always refers to the same data set.
+  start: string; // YYYY-MM-DD
+  end: string;   // YYYY-MM-DD
   // Robustness levers.
   vol_method: "rolling" | "ewma";
   rebalance: "daily" | "weekly" | "monthly";
   dead_band: number; // exposure no-trade zone (0 = off)
-  rf_mode: "manual" | "estr"; // constant vs. realised ECB €STR window mean
+  // Realised daily €STR/EONIA series vs. a flat constant (sensitivity analysis).
+  rf_mode: "estr_chained" | "constant";
   // Custom base allocation of the traditional sleeve (relative weights; the engine
   // renormalises). Default {0.6, 0.3, 0.1} = documented thesis base case.
   trad_weights: { MSCI_World: number; Global_Bonds: number; Gold: number };
@@ -218,6 +234,10 @@ export interface EngineParams {
   mdd_limit: number | null;
   cvar_limit: number | null;
 }
+
+/** Fixed study window — mirrors engine data.STUDY_START / STUDY_END. */
+export const STUDY_START = "2018-01-01";
+export const STUDY_END = "2025-12-31";
 
 /** The documented thesis base allocation (traditional sleeve). */
 export const BASE_TRAD_WEIGHTS = { MSCI_World: 0.6, Global_Bonds: 0.3, Gold: 0.1 } as const;

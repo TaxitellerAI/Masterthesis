@@ -24,6 +24,7 @@ const REFERENCES: string[] = [
   "Holm, S. (1979): A Simple Sequentially Rejective Multiple Test Procedure. Scandinavian Journal of Statistics 6(2).",
   "Moreira, A. / Muir, T. (2017): Volatility-Managed Portfolios. Journal of Finance 72(4).",
   "EZB: Euro Short-Term Rate (€STR), Serie EST.B.EU000A2X2A25.WT, ECB Data Portal.",
+  "EZB: EONIA, Serie EON.D.EONIA_TO.RATE, ECB Data Portal (ab 01.10.2019 = €STR + 8,5 bp).",
 ];
 
 // Methodological & Controlling context. These are DECISION/DISCUSSION pointers
@@ -46,9 +47,14 @@ const NOTES: { title: string; body: string }[] = [
       "Live-Kurse werden über EURUSD nach EUR umgerechnet. Ein EUR-Treasury trägt beim Halten USD-denominierter Krypto/ETFs ein FX-Exposure, das hier in der EUR-Sicht enthalten, aber nicht separat gehedged ist — ein eigenständiges Risiko- und Hedging-Thema.",
   },
   {
-    title: "Zins-Annahme",
+    title: "Risikofreier Zins (tagesgenau, verkettet)",
     body:
-      "Der risikofreie Zins ist konstant angesetzt. Über 2018–2024 verlief €STR/3M-EURIBOR von negativ zu ~4 %; eine Zeitreihe würde Sharpe und Überschussrendite spürbar verändern. Als bewusste Vereinfachung dokumentiert.",
+      "Der risikofreie Zins ist KEINE Konstante, sondern die realisierte Tagesreihe: €STR ab 01.10.2019, davor EONIA − 8,5 bp (offizieller EZB-Umstellungsspread; im Überlappungsfenster gilt er auf allen 579 Tagen exakt, die Verkettung ist also bruchfrei). Das ist ergebniskritisch, nicht kosmetisch: Die Vol-Control verzinst ihre nicht investierte Quote mit (1 − Exposure) · rf, und in ~59 % der Tage dieses Fensters war der Zins negativ — gerade in den Stressphasen mit niedrigem Exposure. Eine feste 3-%-Annahme überzeichnet die Vol-Control-Rendite um rund 0,8 Prozentpunkte p. a., während Buy-and-Hold (voll investiert, keine Cash-Quote) unverändert bleibt. Umrechnung p. a. → täglich nach Geldmarktkonvention act/360 über die tatsächlichen Kalendertage. Der Modus 'Konstant' bleibt für die Sensitivitätsanalyse erhalten.",
+  },
+  {
+    title: "Untersuchungszeitraum & Reproduzierbarkeit",
+    body:
+      "Das Datenfenster ist mit festen Kalendergrenzen definiert (01.01.2018 – 31.12.2025, acht volle Jahre), nicht als rollierendes 'letzte N Jahre' — sonst lieferte jeder Abruf einen anderen Datenstand und keine berichtete Zahl wäre zitierfähig. 2018 ist zugleich das erste Jahr mit vollständiger Historie aller Default-Kryptowerte. Kurse und Zinsreihe sind als Snapshot eingefroren; der Fingerprint-Hash umfasst Fenstergrenzen, Datenquelle und Zinsmodus, sodass zwei Läufe mit unterschiedlichen Annahmen nie denselben Hash tragen.",
   },
   {
     title: "Survivorship-Bias im Krypto-Universum",
@@ -131,7 +137,9 @@ export default function InfoNotes({
             rf{" "}
             <span className="text-ink">
               {(rf.effective_annual * 100).toFixed(2)} %{" "}
-              {rf.mode === "estr" && rf.estr && !rf.estr.error ? "(€STR Ø, ECB)" : "(manuell)"}
+              {rf.mode === "estr_chained" && rf.estr && !rf.estr.error
+                ? "(€STR/EONIA real, Ø)"
+                : "(konstant)"}
             </span>
           </span>
         )}

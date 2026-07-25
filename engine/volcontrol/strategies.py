@@ -87,7 +87,7 @@ def _apply_dead_band(exposure: pd.Series, band: float) -> pd.Series:
 
 
 def vol_control(port_returns: pd.Series, target_vol: float, lookback: int = 60,
-                rf_daily: float = 0.0, td: int = 252, max_leverage: float = 1.0,
+                rf_daily=0.0, td: int = 252, max_leverage: float = 1.0,
                 cost_bps: float = 15.0, vol_method: str = "rolling",
                 ewma_halflife: int = 20, rebalance: str = "daily", dead_band: float = 0.0):
     """Scale exposure inversely to realised volatility.
@@ -97,6 +97,11 @@ def vol_control(port_returns: pd.Series, target_vol: float, lookback: int = 60,
     information available at yesterday's close. Uninvested capital earns the
     risk-free rate; turnover is charged at `cost_bps`. `rebalance` controls how
     often the target is actually traded to; `vol_method` selects the estimator.
+
+    `rf_daily` is a scalar OR a per-period series/array on `port_returns`' index.
+    The series form matters: the cash leg (1 - exposure) is exactly where a
+    constant positive rate would flatter the strategy through the negative-rate
+    years, since exposure is lowest precisely in those stress periods.
 
     Returns (strategy_returns, exposure_series).
     """
@@ -110,7 +115,16 @@ def vol_control(port_returns: pd.Series, target_vol: float, lookback: int = 60,
     turnover.iloc[0] = abs(exposure.iloc[0])
     cost = turnover * (cost_bps / 1e4)
 
-    strat = exposure * port_returns + (1.0 - exposure) * rf_daily - cost
+    # Align a dated/array rf to the return calendar so the cash leg accrues the
+    # rate that actually prevailed on each day.
+    if isinstance(rf_daily, pd.Series):
+        rf = rf_daily.reindex(port_returns.index).ffill().bfill()
+    elif np.ndim(rf_daily) > 0:
+        rf = pd.Series(np.asarray(rf_daily, float), index=port_returns.index)
+    else:
+        rf = float(rf_daily)
+
+    strat = exposure * port_returns + (1.0 - exposure) * rf - cost
     return strat.dropna(), exposure
 
 

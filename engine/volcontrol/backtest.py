@@ -43,14 +43,17 @@ def run_strategies(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
     cost_bps = _blended_cost_bps(crypto_share, cfg)
 
     def _summ(series):
-        return mt.summary(series.values, cfg.rf_daily, cfg.trading_days, cfg.cvar_alpha)
+        # rf is aligned to each strategy's OWN calendar (they differ in length
+        # after warm-up/dropna), so every metric uses the rate that truly applied.
+        return mt.summary(series.values, cfg.rf_for(series.index),
+                          cfg.trading_days, cfg.cvar_alpha)
 
     out = {"weights": weights, "crypto_share": crypto_share, "strategies": {}}
     out["strategies"]["BuyHold"] = {"returns": port, "turnover": 0.0, **_summ(port)}
 
     for tv in cfg.target_vols:
         strat, exposure = st.vol_control(
-            port, tv, cfg.lookback, cfg.rf_daily, cfg.trading_days,
+            port, tv, cfg.lookback, cfg.rf_for(port.index), cfg.trading_days,
             cfg.max_leverage, cost_bps, cfg.vol_method, cfg.ewma_halflife,
             cfg.rebalance, cfg.dead_band,
         )
@@ -106,13 +109,13 @@ def crypto_sweep(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
     for s in shares:
         weights = portfolio_weights(float(s), list(returns.columns), cfg)
         port = st.buy_and_hold(returns, weights)
-        bh = mt.summary(port.values, cfg.rf_daily, cfg.trading_days, cfg.cvar_alpha)
+        bh = mt.summary(port.values, cfg.rf_for(port.index), cfg.trading_days, cfg.cvar_alpha)
         strat, _ = st.vol_control(
-            port, target_vol, cfg.lookback, cfg.rf_daily, cfg.trading_days,
+            port, target_vol, cfg.lookback, cfg.rf_for(port.index), cfg.trading_days,
             cfg.max_leverage, _blended_cost_bps(float(s), cfg),
             cfg.vol_method, cfg.ewma_halflife, cfg.rebalance, cfg.dead_band,
         )
-        vc = mt.summary(strat.values, cfg.rf_daily, cfg.trading_days, cfg.cvar_alpha)
+        vc = mt.summary(strat.values, cfg.rf_for(strat.index), cfg.trading_days, cfg.cvar_alpha)
         rows.append({
             "crypto_share": float(s),
             "d_mdd": vc["max_drawdown"] - bh["max_drawdown"],
@@ -130,10 +133,19 @@ def hypothesis_tests(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
     bh = run["strategies"]["BuyHold"]["returns"].values
     vc = run["strategies"][f"VolControl_{int(target_vol*100)}"]["returns"].values
 
+    # The block bootstrap RESAMPLES days, so a dated rf vector cannot be aligned to
+    # a resampled path. We therefore use the sample MEAN of the realised rf as the
+    # scalar hurdle here — the realised level, not an assumed constant. Documented
+    # simplification: within-sample rf variation is second-order for the Sharpe
+    # DIFFERENCE, which is what H2 tests (both legs face the same hurdle).
+    rf_bar = float(np.mean(np.asarray(
+        cfg.rf_for(run["strategies"][f"VolControl_{int(target_vol*100)}"]["returns"].index),
+        dtype=float)))
+
     h1 = stx.paired_bootstrap_diff(
         vc, bh, mt.max_drawdown, cfg.bootstrap_n, cfg.expected_block, cfg.seed)
     h2 = stx.paired_bootstrap_diff(
-        vc, bh, lambda r: mt.sharpe_ratio(r, cfg.rf_daily, cfg.trading_days),
+        vc, bh, lambda r: mt.sharpe_ratio(r, rf_bar, cfg.trading_days),
         cfg.bootstrap_n, cfg.expected_block, cfg.seed)
     wilcox = stx.wilcoxon_test(vc, bh)
 

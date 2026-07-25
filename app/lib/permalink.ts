@@ -16,10 +16,25 @@ export function decodeParams(s: string): Partial<EngineParams> | null {
   try {
     const json = decodeURIComponent(escape(atob(s)));
     const obj = JSON.parse(json);
-    return typeof obj === "object" && obj !== null ? (obj as Partial<EngineParams>) : null;
+    if (typeof obj !== "object" || obj === null) return null;
+    return migrate(obj as Record<string, unknown>);
   } catch {
     return null;
   }
+}
+
+// Links minted before the reproducibility fix carry a rolling `years` window, the
+// retired "synthetic" source and the old rf-mode names. Map them onto the current
+// schema so an already-cited link still opens instead of erroring out.
+function migrate(o: Record<string, unknown>): Partial<EngineParams> {
+  const out = { ...o } as Record<string, unknown>;
+  if ("years" in out) {
+    delete out.years; // rolling window replaced by explicit calendar bounds
+  }
+  if (out.source === "synthetic") out.source = "frozen";
+  if (out.rf_mode === "manual") out.rf_mode = "constant";
+  if (out.rf_mode === "estr") out.rf_mode = "estr_chained";
+  return out as Partial<EngineParams>;
 }
 
 /** Write the current config into the URL (replaceState — no history spam). */

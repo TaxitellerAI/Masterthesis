@@ -18,7 +18,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from volcontrol import (
-    EngineConfig, load_prices, simple_returns, fetch_prices_yf, fetch_rf_estr, fingerprint,
+    EngineConfig, load_prices, simple_returns, fetch_prices_yf, fingerprint,
+    load_rf_frozen, rf_daily_series, STUDY_START, STUDY_END,
     run_strategies, metrics_table, crypto_sweep, hypothesis_tests,
     describe_assets, correlation_matrix, sample_window, asset_calendar_returns,
     ticker_map, universe_payload,
@@ -34,8 +35,9 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
 
-DATA_PATH = "data/synthetic_prices.csv"       # synthetic fixture for the "synthetic" source
+DATA_PATH = "data/synthetic_prices.csv"       # internal fixture (tests + /health only)
 FROZEN_PATH = "data/frozen_prices_eur.csv"    # frozen real-market snapshot (EUR), reproducible
+FROZEN_RF_PATH = "data/frozen_rf_eur.csv"     # frozen chained €STR/EONIA series
 LIVE_TTL_SECONDS = 900                         # reuse a live pull for 15 min (data is daily)
 
 
@@ -46,13 +48,18 @@ class RunRequest(BaseModel):
     rf_annual: float = 0.03
     # --- data selection (additive; defaults reproduce the original behaviour) ---
     assets: Optional[list[str]] = None     # canonical names to include; None = full universe
-    source: str = "synthetic"              # "synthetic" | "live" | "frozen"
-    years: int = 8                          # history length for the live pull
+    source: str = "frozen"                 # "frozen" (default, reproducible) | "live" | "synthetic"
+    # Explicit calendar window — NOT a rolling "last N years", which would return a
+    # different data set on every call and make the reported figures irreproducible.
+    start: str = STUDY_START
+    end: str = STUDY_END
     # --- robustness levers ---
     vol_method: str = "rolling"            # "rolling" | "ewma"
     rebalance: str = "daily"               # "daily" | "weekly" | "monthly"
     dead_band: float = 0.0                 # exposure no-trade zone (e.g. 0.05)
-    rf_mode: str = "manual"                # "manual" (rf_annual) | "estr" (ECB window mean)
+    # "estr_chained" = realised daily €STR/EONIA series (default);
+    # "constant" = the flat rf_annual assumption, kept for the sensitivity analysis.
+    rf_mode: str = "estr_chained"
     # --- optional custom base allocation (traditional sleeve, relative weights);
     #     None reproduces the documented 60/30/10 thesis base case ---
     trad_weights: Optional[dict[str, float]] = None
@@ -78,25 +85,32 @@ def _frozen_prices() -> pd.DataFrame:
 # changing the asset subset or tuning sliders never triggers a refetch. The
 # cache expires after LIVE_TTL_SECONDS; a fresh configurator run after that
 # pulls current quotes again.
-_live_cache: dict[tuple[int, str], tuple[float, pd.DataFrame]] = {}
+_live_cache: dict[tuple[str, str, str], tuple[float, pd.DataFrame]] = {}
 
 
-def _live_prices(years: int, base_currency: str) -> pd.DataFrame:
-    key = (years, base_currency.upper())
+def _live_prices(start: str, end: str, base_currency: str) -> pd.DataFrame:
+    key = (start, end, base_currency.upper())
     hit = _live_cache.get(key)
     now = time.time()
     if hit and now - hit[0] < LIVE_TTL_SECONDS:
         return hit[1]
-    prices = fetch_prices_yf(ticker_map(), years, base_currency)  # full universe
+    prices = fetch_prices_yf(ticker_map(), start, end, base_currency)  # full universe
     _live_cache[key] = (now, prices)
     return prices
+
+
+@lru_cache(maxsize=1)
+def _frozen_rf() -> tuple:
+    """Frozen chained risk-free series — so reproduction never depends on the ECB API."""
+    ser, meta = load_rf_frozen(FROZEN_RF_PATH)
+    return ser, meta
 
 
 def _prices_raw(req: RunRequest) -> pd.DataFrame:
     """Native (un-aligned) price matrix for the selected assets and source."""
     try:
         if req.source == "live":
-            prices = _live_prices(req.years, req.base_currency)
+            prices = _live_prices(req.start, req.end, req.base_currency)
         elif req.source == "frozen":
             prices = _frozen_prices()
         else:
@@ -107,7 +121,13 @@ def _prices_raw(req: RunRequest) -> pd.DataFrame:
     cols = [c for c in (req.assets or list(prices.columns)) if c in prices.columns]
     if not cols:
         raise HTTPException(status_code=400, detail="Keine gültigen Assets ausgewählt.")
-    return prices[cols]
+    prices = prices[cols]
+    if req.source in ("live", "frozen"):       # enforce the explicit study window
+        prices = prices.loc[req.start:req.end]
+        if prices.empty:
+            raise HTTPException(status_code=422,
+                                detail=f"Keine Kurse im Fenster {req.start}..{req.end}.")
+    return prices
 
 
 def _returns_for(req: RunRequest) -> pd.DataFrame:
@@ -132,31 +152,47 @@ def _returns_for(req: RunRequest) -> pd.DataFrame:
 
 TRAD_ORDER = ("MSCI_World", "Global_Bonds", "Gold")
 
-# €STR window means, cached per (start, end) — the ECB series is daily and static
-# for past windows, so a long TTL is safe.
-_estr_cache: dict[tuple[str, str], dict] = {}
+def _rf_mode(req: RunRequest) -> str:
+    """Normalise the mode, accepting the legacy names from older permalinks."""
+    m = {"manual": "constant", "estr": "estr_chained"}.get(req.rf_mode, req.rf_mode)
+    return m if m in ("constant", "estr_chained") else "estr_chained"
 
 
-def _resolve_rf(req: RunRequest, rets: pd.DataFrame) -> tuple[float, Optional[dict]]:
-    """Effective risk-free rate: the manual constant, or the realised €STR mean
-    over the sample window (ECB). Falls back to manual if the ECB is unreachable."""
-    if req.rf_mode != "estr" or rets.empty:
-        return req.rf_annual, None
-    key = (str(rets.index.min().date()), str(rets.index.max().date()))
-    info = _estr_cache.get(key)
-    if info is None:
-        try:
-            info = fetch_rf_estr(*key)
-            _estr_cache[key] = info
-        except Exception:
-            return req.rf_annual, {"error": "ECB nicht erreichbar — manueller Zins verwendet."}
-    return info["mean_annual"], info
+def _resolve_rf(req: RunRequest, rets: pd.DataFrame):
+    """Return (effective_annual, rf_series | None, info).
+
+    Default is the frozen chained €STR/EONIA DAILY series. A single constant is
+    not merely cosmetic here: vol_control remunerates the un-invested share with
+    (1 - exposure) * rf, and over this sample the realised rate was NEGATIVE on
+    ~59 % of days — a flat +3 % would credit the strategy a carry it never earned,
+    precisely in the stress periods where exposure is lowest.
+    """
+    if _rf_mode(req) == "constant" or rets.empty:
+        return req.rf_annual, None, {"mode": "constant", "rf_annual": req.rf_annual}
+    try:
+        ser, meta = _frozen_rf()
+    except Exception as e:
+        return req.rf_annual, None, {"mode": "constant",
+                                     "error": f"rf-Reihe nicht ladbar ({e}) — Konstante verwendet."}
+    win = ser.reindex(ser.index.union(rets.index)).ffill().reindex(rets.index).bfill()
+    info = dict(meta)
+    info.update({
+        "window_mean_annual": float(win.mean()),
+        "window_min_annual": float(win.min()),
+        "window_max_annual": float(win.max()),
+        "window_share_negative": float((win < 0).mean()),
+        "convention": "act360",
+    })
+    # cfg.rf_annual is used for the per-asset descriptive Sharpe; set it to the
+    # realised window mean so that block is consistent with the backtest.
+    return float(win.mean()), ser, info
 
 
 def _cfg(req: RunRequest, **overrides) -> EngineConfig:
     kw = dict(
         base_currency=req.base_currency, rf_annual=req.rf_annual,
         vol_method=req.vol_method, rebalance=req.rebalance, dead_band=req.dead_band,
+        rf_mode=_rf_mode(req),
     )
     # Optional custom base allocation — passed as relative weights (portfolio_weights
     # renormalises them). Only the three traditional sleeve assets are configurable.
@@ -194,12 +230,24 @@ def _limit_flags(table: list, req: RunRequest) -> list:
     return table
 
 
+def _run_spec(req: RunRequest) -> dict:
+    """The choices that DEFINE a run — hashed into the fingerprint so a citable
+    result can never be confused with one from a different window or rf mode."""
+    return {
+        "source": req.source,
+        "window_start": req.start,
+        "window_end": req.end,
+        "rf_mode": _rf_mode(req),
+        "base_currency": req.base_currency.upper(),
+    }
+
+
 def _prepared(req: RunRequest, **cfg_overrides):
     """Returns (returns_matrix, cfg, rf_info) with the risk-free rate resolved —
-    the one place where rf_mode='estr' swaps the constant for the ECB window mean."""
+    the one place where the realised rf series replaces the flat constant."""
     rets = _returns_for(req)
-    rf_annual, rf_info = _resolve_rf(req, rets)
-    cfg = _cfg(req, rf_annual=rf_annual, **cfg_overrides)
+    rf_annual, rf_series, rf_info = _resolve_rf(req, rets)
+    cfg = _cfg(req, rf_annual=rf_annual, rf_series=rf_series, **cfg_overrides)
     return rets, cfg, rf_info
 
 
@@ -213,8 +261,8 @@ def backtest(req: RunRequest):
         "crypto_share": req.crypto_share,
         "metrics": table,
         "limits": {"mdd_limit": req.mdd_limit, "cvar_limit": req.cvar_limit},
-        "fingerprint": fingerprint(rets),
-        "rf": {"mode": req.rf_mode, "effective_annual": cfg.rf_annual, "estr": rf_info},
+        "fingerprint": fingerprint(rets, _run_spec(req)),
+        "rf": {"mode": _rf_mode(req), "effective_annual": cfg.rf_annual, "estr": rf_info},
     }
 
 
@@ -261,7 +309,7 @@ def dataset(req: RunRequest):
     if req.source in ("live", "frozen"):
         prices = prices.dropna()
     rets = _returns_for(req)
-    fp = fingerprint(rets)
+    fp = fingerprint(rets, _run_spec(req))
     csv = prices.to_csv(index_label="date")
     return Response(
         content=csv,
@@ -321,10 +369,11 @@ def workbook(req: RunRequest):
         "crypto_share": req.crypto_share, "target_vol": req.target_vol,
         "base_currency": req.base_currency, "source": req.source,
         "cost_bps": _blended_cost_bps(req.crypto_share, cfg),
-        "fingerprint": fingerprint(rets),
+        "fingerprint": fingerprint(rets, _run_spec(req)),
         "trad_split": trad_split, "trad_is_base": trad_is_base,
-        "rf_mode": req.rf_mode, "rf_effective": cfg.rf_annual,
+        "rf_mode": _rf_mode(req), "rf_effective": cfg.rf_annual,
         "rf_estr": rf_info,
+        "window_start": req.start, "window_end": req.end,
         "generated_at": pd.Timestamp.utcnow().isoformat(timespec="seconds"),
     }
     xbytes = build_workbook(prices, rets, weights, exposure, vc_ret, cfg, meta, extras)
@@ -343,14 +392,20 @@ def describe(req: RunRequest):
     between crypto and equities). Correlation and the reported window use the
     ALIGNED complete-case sample, since correlation requires paired observations.
     """
-    cfg = _cfg(req)
     native = _prices_raw(req)
     aligned = _returns_for(req)
+    # Resolve rf the same way the backtest does, so the per-asset Sharpe here and
+    # the strategy Sharpe in /backtest rest on one identical rate definition.
+    rf_annual, _rf_series, rf_info = _resolve_rf(req, aligned)
+    cfg = _cfg(req, rf_annual=rf_annual)
     stats = describe_assets(native, cfg.rf_annual, cfg.cvar_alpha)
     return {
         "source": req.source,
         "base_currency": req.base_currency,
         "fetched_at": pd.Timestamp.utcnow().isoformat(),
+        "requested_window": {"start": req.start, "end": req.end},
+        "rf": {"mode": _rf_mode(req), "effective_annual": cfg.rf_annual, "estr": rf_info},
+        "fingerprint": fingerprint(aligned, _run_spec(req)),
         "window": sample_window(aligned),   # common (aligned) analysis window
         "assets": stats.round(6).to_dict(orient="records"),
         "correlation": correlation_matrix(aligned),

@@ -50,7 +50,6 @@ def build_workbook(prices: pd.DataFrame, returns: pd.DataFrame, weights: dict,
 
     assets = list(returns.columns)
     na = len(assets)
-    rf_daily = cfg.rf_daily
     td = cfg.trading_days
     cost_bps = meta["cost_bps"]
 
@@ -162,7 +161,12 @@ def build_workbook(prices: pd.DataFrame, returns: pd.DataFrame, weights: dict,
     # ── Portfolio (formulas) ─────────────────────────────────────────────────
     wsp = wb.create_sheet("Portfolio")
     heads = ["Datum", "BH-Rendite", "BH-Wealth", "BH-Peak", "BH-Drawdown",
-             "VC-Exposure", "VC-Kosten", "VC-Rendite", "VC-Wealth", "VC-Peak", "VC-Drawdown"]
+             "VC-Exposure", "VC-Kosten", "VC-Rendite", "VC-Wealth", "VC-Peak", "VC-Drawdown",
+             "rf (Tag)"]
+    # The risk-free rate varies day by day (€STR/EONIA, negative until mid-2022),
+    # so it is written as its OWN column and referenced by the formulas — the
+    # examiner can trace every cash-leg cent instead of trusting a hard-coded constant.
+    rf_vec = pd.Series(np.asarray(cfg.rf_for(returns.index), dtype=float), index=returns.index)
     for j, h in enumerate(heads):
         wsp.cell(1, j + 1, h).font = _HEAD
     rlast = _col(na + 1)  # last asset column letter in Renditen
@@ -199,8 +203,11 @@ def build_workbook(prices: pd.DataFrame, returns: pd.DataFrame, weights: dict,
                     else f"=ABS(F{row}-F{row-1})*{cost_bps}/10000")
         co.number_format = _NUM4
         # VC return = e*BH + (1-e)*rf - cost
+        rfc = wsp.cell(row, 12)
+        rfc.value = round(float(rf_vec.get(d, 0.0)), 10)
+        rfc.number_format = "0.00000000"
         vr = wsp.cell(row, 8)
-        vr.value = f"=F{row}*B{row}+(1-F{row})*{rf_daily}-G{row}"
+        vr.value = f"=F{row}*B{row}+(1-F{row})*L{row}-G{row}"
         vr.number_format = _PCT
         if d == vc_start_date:
             vc_excel_row = row
@@ -231,19 +238,25 @@ def build_workbook(prices: pd.DataFrame, returns: pd.DataFrame, weights: dict,
     for j, h in enumerate(mheads):
         wsm.cell(1, j + 1, h).font = _HEAD
 
-    def _metric_row(row, label, ret, dd, wealth_last):
+    bh_rf = f"Portfolio!$L${bh_first}:$L${bh_last}"
+    vc_rf = f"Portfolio!$L${vc_first}:$L${bh_last}"
+
+    def _metric_row(row, label, ret, dd, wealth_last, rf_ref):
         wsm.cell(row, 1, label)
         wsm.cell(row, 2, f"=AVERAGE({ret})*{td}").number_format = _PCT
         # CAGR from the compounded final wealth (avoids PRODUCT-array pitfalls).
         wsm.cell(row, 3, f"={wealth_last}^({td}/COUNT({ret}))-1").number_format = _PCT
         wsm.cell(row, 4, f"=STDEV({ret})*SQRT({td})").number_format = _PCT
-        wsm.cell(row, 5, f"=(AVERAGE({ret})-{rf_daily})/STDEV({ret})*SQRT({td})").number_format = "0.000"
+        wsm.cell(row, 5,
+                 f"=(AVERAGE({ret})-AVERAGE({rf_ref}))/STDEV({ret})*SQRT({td})"
+                 ).number_format = "0.000"
         wsm.cell(row, 6, f"=MIN({dd})").number_format = _PCT
         # Legacy PERCENTILE (no .INC) so both Excel and LibreOffice resolve it.
         wsm.cell(row, 7, f'=AVERAGEIF({ret},"<="&PERCENTILE({ret},{cfg.cvar_alpha}))').number_format = _PCT
 
-    _metric_row(2, "Buy-and-Hold", bh_ret, bh_dd, bh_wealth_last)
-    _metric_row(3, f"Vol-Control {int(meta['target_vol']*100)} %", vc_ret, vc_dd, vc_wealth_last)
+    _metric_row(2, "Buy-and-Hold", bh_ret, bh_dd, bh_wealth_last, bh_rf)
+    _metric_row(3, f"Vol-Control {int(meta['target_vol']*100)} %", vc_ret, vc_dd,
+                vc_wealth_last, vc_rf)
     wsm.cell(5, 1, "Alle Kennzahlen sind live aus dem Blatt 'Portfolio' berechnet.").font = _MUTE
 
     # ── Engine-value sheets (Deskriptiv / Sweep / Hypothesen / Regime / WF) ──

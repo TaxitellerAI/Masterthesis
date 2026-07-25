@@ -1,6 +1,9 @@
 """volcontrol — volatility-control backtest engine for the master's thesis."""
 from .config import EngineConfig
-from .data import load_prices, simple_returns, fetch_prices_yf, fetch_rf_estr, fingerprint
+from .data import (
+    load_prices, simple_returns, fetch_prices_yf, fetch_rf_estr, fingerprint,
+    fetch_rf_chained, load_rf_frozen, rf_daily_series, STUDY_START, STUDY_END,
+)
 from . import metrics, strategies, stats, descriptive, universe, analysis
 from .descriptive import describe_assets, correlation_matrix, sample_window, asset_calendar_returns
 from .universe import UNIVERSE, ticker_map, universe_payload
@@ -24,6 +27,11 @@ __all__ = [
     "simple_returns",
     "fetch_prices_yf",
     "fetch_rf_estr",
+    "fetch_rf_chained",
+    "load_rf_frozen",
+    "rf_daily_series",
+    "STUDY_START",
+    "STUDY_END",
     "fingerprint",
     "metrics",
     "strategies",

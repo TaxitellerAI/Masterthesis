@@ -7,8 +7,14 @@ def ann_volatility(r: np.ndarray, td: int = 252) -> float:
     return float(np.std(r, ddof=1) * np.sqrt(td))
 
 
-def sharpe_ratio(r: np.ndarray, rf_daily: float = 0.0, td: int = 252) -> float:
-    excess = np.asarray(r, float) - rf_daily
+def sharpe_ratio(r: np.ndarray, rf_daily=0.0, td: int = 252) -> float:
+    """Annualised Sharpe ratio.
+
+    `rf_daily` is either a scalar (constant assumption) or a per-period array of
+    the SAME length as `r` (the realised €STR/EONIA accrual). The array form makes
+    the excess return honest over a sample containing negative rates.
+    """
+    excess = np.asarray(r, float) - np.asarray(rf_daily, float)
     sd = np.std(excess, ddof=1)
     if sd == 0:
         return float("nan")
@@ -47,8 +53,9 @@ def cvar(r: np.ndarray, alpha: float = 0.05) -> float:
     return float(tail.mean()) if tail.size else float(q)
 
 
-def summary(r: np.ndarray, rf_daily: float = 0.0, td: int = 252,
+def summary(r: np.ndarray, rf_daily=0.0, td: int = 252,
             alpha: float = 0.05) -> dict:
+    """Metric bundle. `rf_daily`: scalar or per-period array (see sharpe_ratio)."""
     r = np.asarray(r, float)
     return {
         "ann_return": float(np.mean(r) * td),   # arithmetic annualisation

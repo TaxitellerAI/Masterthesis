@@ -80,8 +80,8 @@ def subperiod_metrics(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
         m_bh, m_vc = bh.loc[start:end], vc.loc[start:end]
         if len(m_bh) < 15 or len(m_vc) < 15:
             continue
-        s_bh = mt.summary(m_bh.values, cfg.rf_daily, cfg.trading_days, cfg.cvar_alpha)
-        s_vc = mt.summary(m_vc.values, cfg.rf_daily, cfg.trading_days, cfg.cvar_alpha)
+        s_bh = mt.summary(m_bh.values, cfg.rf_for(m_bh.index), cfg.trading_days, cfg.cvar_alpha)
+        s_vc = mt.summary(m_vc.values, cfg.rf_for(m_vc.index), cfg.trading_days, cfg.cvar_alpha)
         rows.append({
             "period": name,
             "start": str(m_vc.index.min().date()),
@@ -109,10 +109,11 @@ def param_stability(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
         row = []
         for tv in target_vols:
             strat, _ = st.vol_control(
-                port, tv, lb, cfg.rf_daily, cfg.trading_days, cfg.max_leverage,
+                port, tv, lb, cfg.rf_for(port.index), cfg.trading_days, cfg.max_leverage,
                 cost, cfg.vol_method, cfg.ewma_halflife, cfg.rebalance, cfg.dead_band,
             )
-            row.append(round(mt.sharpe_ratio(strat.values, cfg.rf_daily, cfg.trading_days), 3))
+            row.append(round(mt.sharpe_ratio(strat.values, cfg.rf_for(strat.index),
+                                             cfg.trading_days), 3))
         grid.append(row)
     return {"lookbacks": lookbacks, "target_vols": target_vols, "sharpe": grid}
 
@@ -132,7 +133,7 @@ def walk_forward(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
     # Precompute each candidate strategy once over the full sample.
     strat = {}
     for tv in cfg.target_vols:
-        s, _ = st.vol_control(port, tv, cfg.lookback, cfg.rf_daily, cfg.trading_days,
+        s, _ = st.vol_control(port, tv, cfg.lookback, cfg.rf_for(port.index), cfg.trading_days,
                               cfg.max_leverage, cost, cfg.vol_method, cfg.ewma_halflife, cfg.rebalance, cfg.dead_band)
         strat[tv] = s
     idx = strat[cfg.target_vols[0]].index
@@ -141,7 +142,7 @@ def walk_forward(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
         return {"folds": [], "oos": {"dates": [], "wealth": [], "bh_wealth": []}, "oos_metrics": {}, "bh_oos_metrics": {}}
 
     def _sh(series):
-        return mt.sharpe_ratio(series.values, cfg.rf_daily, cfg.trading_days)
+        return mt.sharpe_ratio(series.values, cfg.rf_for(series.index), cfg.trading_days)
 
     start = int(n * train_frac)
     bounds = np.linspace(start, n, n_folds + 1).astype(int)
@@ -182,8 +183,10 @@ def walk_forward(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
             "wealth": [round(float(x), 5) for x in vc_wealth.values[::stride]],
             "bh_wealth": [round(float(x), 5) for x in bh_wealth.values[::stride]],
         },
-        "oos_metrics": mt.summary(oos_ret.values, cfg.rf_daily, cfg.trading_days, cfg.cvar_alpha),
-        "bh_oos_metrics": mt.summary(bh_oos.values, cfg.rf_daily, cfg.trading_days, cfg.cvar_alpha),
+        "oos_metrics": mt.summary(oos_ret.values, cfg.rf_for(oos_ret.index),
+                                  cfg.trading_days, cfg.cvar_alpha),
+        "bh_oos_metrics": mt.summary(bh_oos.values, cfg.rf_for(bh_oos.index),
+                                     cfg.trading_days, cfg.cvar_alpha),
     }
 
 
@@ -196,7 +199,10 @@ def rolling_metrics(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
     vc = run["strategies"][f"VolControl_{int(target_vol * 100)}"]["returns"]
 
     def _roll(s):
-        m = s.rolling(window).mean() - cfg.rf_daily
+        # Excess return per DAY first (rf varied from -0.6 % to +3.9 % p.a. across
+        # this sample), then roll — not a single constant subtracted afterwards.
+        ex = s - pd.Series(np.asarray(cfg.rf_for(s.index), dtype=float), index=s.index)
+        m = ex.rolling(window).mean()
         sd = s.rolling(window).std(ddof=1)
         return (m / sd) * np.sqrt(cfg.trading_days)
 
@@ -359,10 +365,10 @@ def cost_sensitivity(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
     points = []
     for m in multipliers:
         strat, _ = st.vol_control(
-            port, target_vol, cfg.lookback, cfg.rf_daily, cfg.trading_days,
+            port, target_vol, cfg.lookback, cfg.rf_for(port.index), cfg.trading_days,
             cfg.max_leverage, base * m, cfg.vol_method, cfg.ewma_halflife, cfg.rebalance, cfg.dead_band,
         )
-        s = mt.summary(strat.values, cfg.rf_daily, cfg.trading_days, cfg.cvar_alpha)
+        s = mt.summary(strat.values, cfg.rf_for(strat.index), cfg.trading_days, cfg.cvar_alpha)
         points.append({
             "cost_mult": m, "cost_bps": round(base * m, 2),
             "sharpe": round(s["sharpe"], 4), "cagr": round(s["cagr"], 4),

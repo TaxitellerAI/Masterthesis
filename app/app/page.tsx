@@ -19,6 +19,7 @@ import {
   ensureEngineAwake,
 } from "@/lib/api";
 import { readUrlConfig, syncUrl } from "@/lib/permalink";
+import { STUDY_START, STUDY_END } from "@/lib/types";
 import type {
   AnalyticsResponse,
   AssetInfo,
@@ -40,12 +41,13 @@ const DEFAULTS: EngineParams = {
   base_currency: "EUR",
   rf_annual: 0.03,
   assets: [],
-  source: "synthetic",
-  years: 8,
+  source: "frozen",
+  start: STUDY_START,
+  end: STUDY_END,
   vol_method: "rolling",
   rebalance: "daily",
   dead_band: 0,
-  rf_mode: "manual",
+  rf_mode: "estr_chained",
   trad_weights: { MSCI_World: 0.6, Global_Bonds: 0.3, Gold: 0.1 },
   mdd_limit: null,
   cvar_limit: null,

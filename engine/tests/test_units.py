@@ -8,6 +8,7 @@ import math
 import os
 import sys
 import numpy as np
+import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -126,6 +127,68 @@ def test_rolling_correlation_bounded():
     for vals in rc["series"].values():
         finite = [x for x in vals if x is not None]
         assert all(-1.0001 <= x <= 1.0001 for x in finite)
+
+
+def test_rf_act360_weekend_accrual():
+    """A Monday after a normal weekend must accrue THREE days of interest."""
+    from volcontrol.data import rf_daily_series
+    idx = pd.DatetimeIndex(["2024-01-04", "2024-01-05", "2024-01-08"])  # Thu, Fri, Mon
+    rf = rf_daily_series(pd.Series(0.0360, index=idx), idx, "act360")
+    assert abs(float(rf.iloc[-1]) - 0.0360 * 3 / 360) < 1e-12   # Fri -> Mon = 3 days
+    assert abs(float(rf.iloc[1]) - 0.0360 * 1 / 360) < 1e-12    # Thu -> Fri = 1 day
+
+
+def test_rf_negative_rates_survive():
+    """The chained series must keep negative rates — that is the whole point."""
+    from volcontrol.data import rf_daily_series
+    idx = pd.date_range("2019-01-01", periods=5, freq="D")
+    rf = rf_daily_series(pd.Series(-0.005, index=idx), idx, "act360")
+    assert (rf < 0).all()
+
+
+def test_rf_scalar_path_unchanged():
+    """Scalar rf must still behave exactly like the legacy constant/252 model."""
+    from volcontrol.data import rf_daily_series
+    idx = pd.date_range("2020-01-01", periods=10, freq="B")
+    rf = rf_daily_series(0.03, idx, "simple_252", trading_days=252)
+    assert np.allclose(rf.to_numpy(), 0.03 / 252)
+
+
+def test_vol_control_cash_leg_uses_series():
+    """A negative rf must REDUCE the vol-control return via the cash leg."""
+    from volcontrol import strategies as stt
+    idx = pd.date_range("2020-01-01", periods=400, freq="B")
+    rng = np.random.default_rng(7)
+    port = pd.Series(rng.normal(0.0002, 0.02, len(idx)), index=idx)
+    pos = stt.vol_control(port, 0.10, 60, pd.Series(0.0002, index=idx), cost_bps=0.0)[0]
+    neg = stt.vol_control(port, 0.10, 60, pd.Series(-0.0002, index=idx), cost_bps=0.0)[0]
+    assert pos.sum() > neg.sum()          # positive carry beats negative carry
+
+
+def test_fingerprint_separates_rf_modes():
+    """Same data, different rf treatment -> different citable hash."""
+    from volcontrol.data import fingerprint
+    idx = pd.date_range("2020-01-01", periods=50, freq="B")
+    df = pd.DataFrame({"A": np.linspace(0.001, 0.002, 50)}, index=idx)
+    h1 = fingerprint(df, {"rf_mode": "estr_chained"})["hash"]
+    h2 = fingerprint(df, {"rf_mode": "constant"})["hash"]
+    assert h1 != h2
+
+
+def test_study_window_is_fixed_calendar():
+    """The default window must be explicit bounds, not a rolling period."""
+    import inspect
+    from volcontrol import data as vd
+    assert vd.STUDY_START == "2018-01-01" and vd.STUDY_END == "2025-12-31"
+    sig = inspect.signature(vd.fetch_prices_yf)
+    assert "start" in sig.parameters and "end" in sig.parameters
+    assert "years" not in sig.parameters          # rolling window must be gone
+    # Inspect the CODE, not the docstring (which explains why period= was dropped).
+    src = inspect.getsource(vd.fetch_prices_yf)
+    code = "\n".join(l for l in src.splitlines() if not l.strip().startswith("#"))
+    code = code.split('"""')[0] + '"""'.join(code.split('"""')[2:])   # drop docstring
+    assert "period=" not in code                  # no rolling window in the actual call
+    assert "start=start" in code and "end=end_excl" in code
 
 
 if __name__ == "__main__":

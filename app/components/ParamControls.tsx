@@ -99,8 +99,8 @@ export default function ParamControls({ params, onChange }: Props) {
         <div className="inline-flex border border-hairline-strong mb-2">
           {(
             [
-              { id: "manual", label: "Manuell" },
-              { id: "estr", label: "€STR (ECB)" },
+              { id: "estr_chained", label: "€STR/EONIA (real)" },
+              { id: "constant", label: "Konstant" },
             ] as const
           ).map((o, i) => (
             <button
@@ -115,7 +115,7 @@ export default function ParamControls({ params, onChange }: Props) {
             </button>
           ))}
         </div>
-        {params.rf_mode === "manual" ? (
+        {params.rf_mode === "constant" ? (
           <div className="flex items-center border border-hairline-strong bg-paper">
             <input
               id="rf"
@@ -136,8 +136,10 @@ export default function ParamControls({ params, onChange }: Props) {
           </div>
         ) : (
           <p className="text-faint text-xs leading-snug">
-            Realisierter €STR-Durchschnitt des Datenfensters (ECB SDMX, ab Okt 2019) — ersetzt die
-            willkürliche Konstante durch das tatsächliche Zinsniveau der Stichprobe.
+            Tagesgenaue realisierte Zinsreihe: €STR ab Okt 2019, davor EONIA − 8,5 bp (ECB SDMX,
+            eingefroren). In ~59 % der Tage dieses Fensters war der Zins <em>negativ</em> — eine
+            feste Konstante würde der Cash-Quote der Vol-Control einen Ertrag gutschreiben, den
+            sie nie verdient hat. „Konstant“ bleibt für die Sensitivitätsanalyse.
           </p>
         )}
       </div>
