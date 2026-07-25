@@ -469,6 +469,55 @@ def test_grid_matches_metrics_table():
     assert abs(g["sharpe"][i][j] - float(t.loc["VolControl_10", "sharpe"])) < 6e-4
 
 
+def test_hypothesis_tests_accepts_precomputed_inputs():
+    """Handing over already-computed pieces must not move a single number."""
+    from volcontrol.config import EngineConfig
+    from volcontrol.backtest import (hypothesis_tests, run_strategies, crypto_sweep)
+    r = _s1_returns()
+    cfg = EngineConfig(rf_mode="constant", bootstrap_n=300)
+    fresh = hypothesis_tests(r, cfg, 0.10, 0.10)
+    run = run_strategies(r, cfg, 0.10)
+    sw = crypto_sweep(r, cfg, 0.10)
+    reused = hypothesis_tests(r, cfg, 0.10, 0.10, run=run, sweep_df=sw)
+    for k in ("H1_max_drawdown", "H2_sharpe", "H3_dMDD_vs_share", "H3_dCVaR_vs_share"):
+        assert fresh[k] == reused[k], k
+    assert fresh["holm_adjusted"] == reused["holm_adjusted"]
+    assert fresh["deflated_sharpe"] == reused["deflated_sharpe"]
+
+
+def test_cache_key_separates_every_relevant_setting():
+    """A cache keyed on a subset could serve figures from another configuration.
+
+    This drives the API's real key builder, so the guard cannot drift from the code
+    it protects.
+    """
+    import sys as _sys, os as _os
+    _sys.path.insert(0, _os.path.join(_os.path.dirname(__file__), ".."))
+    from api.main import RunRequest, _analysis_key, _prepared
+    base = RunRequest(scenario="S1", crypto_share=0.10, target_vol=0.10)
+    rets, cfg, *_ = _prepared(base)
+    k0 = _analysis_key(base, rets, cfg)
+
+    variants = {
+        "target_vol": {"target_vol": 0.15},
+        "rf_mode": {"rf_mode": "constant"},
+        "rf_annual": {"rf_mode": "constant", "rf_annual": 0.05},
+        "scenario": {"scenario": "S3"},
+        "vol_method": {"vol_method": "ewma"},
+        "rebalance": {"rebalance": "monthly"},
+        "dead_band": {"dead_band": 0.05},
+        "trad_weights": {"trad_weights": {"MSCI_World": 0.5, "Global_Bonds": 0.3, "Gold": 0.2}},
+    }
+    for name, mod in variants.items():
+        req = RunRequest(**{**base.model_dump(), **mod})
+        rr, cc, *_ = _prepared(req)
+        assert _analysis_key(req, rr, cc) != k0, f"Cache-Key unterscheidet {name} NICHT"
+    # identical request -> identical key (otherwise the cache would never hit)
+    again = RunRequest(**base.model_dump())
+    ra, ca, *_ = _prepared(again)
+    assert _analysis_key(again, ra, ca) == k0
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

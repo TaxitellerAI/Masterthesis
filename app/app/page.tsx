@@ -40,6 +40,25 @@ type Step = "landing" | "configure" | "results";
 const sameSet = (a: string[], b: string[]) =>
   a.length === b.length && [...a].sort().join("|") === [...b].sort().join("|");
 
+/** Do two parameter sets imply the SAME inference result? Only the inputs the
+ *  hypothesis tests actually consume count — a changed chart setting must not mark
+ *  the results stale, and a changed model setting must. */
+const sameInferenceInputs = (a: EngineParams, b: EngineParams) =>
+  a.scenario === b.scenario &&
+  a.source === b.source &&
+  a.start === b.start &&
+  a.end === b.end &&
+  a.target_vol === b.target_vol &&
+  a.crypto_share === b.crypto_share &&
+  a.rf_mode === b.rf_mode &&
+  a.rf_annual === b.rf_annual &&
+  a.vol_method === b.vol_method &&
+  a.rebalance === b.rebalance &&
+  a.dead_band === b.dead_band &&
+  a.base_currency === b.base_currency &&
+  sameSet(a.assets, b.assets) &&
+  JSON.stringify(a.trad_weights) === JSON.stringify(b.trad_weights);
+
 const DEFAULTS: EngineParams = {
   crypto_share: 0.1,
   target_vol: 0.1,
@@ -85,6 +104,9 @@ export default function Page() {
   const [loadingSlow, setLoadingSlow] = useState(false); // robustness
   const [loadingHyp, setLoadingHyp] = useState(false); // bootstrap
   const [error, setError] = useState<string | null>(null);
+  // Parameters the CURRENT hypothesis results were computed for; if they drift away
+  // from `params`, the panel says so instead of showing figures for another setting.
+  const [hypParams, setHypParams] = useState<EngineParams | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
   const [downloadingDataset, setDownloadingDataset] = useState(false);
@@ -168,14 +190,24 @@ export default function Page() {
     [scenarios],
   );
 
-  // Fetch the slower analyses (hypotheses bootstrap + robustness grid).
-  const fetchSlow = useCallback((p: EngineParams, id: number) => {
+  /** Inference is EXPENSIVE (data-level sweep bootstrap, B = 1000 ≈ 7 s cold), so it
+   *  never rides along with a slider drag — it runs on the initial run and on an
+   *  explicit request. Everything else stays live. */
+  const runInference = useCallback((p: EngineParams, id: number) => {
     setLoadingHyp(true);
-    setLoadingSlow(true);
     fetchHypotheses(p)
-      .then((h) => id === reqId.current && setHypotheses(h))
+      .then((h) => {
+        if (id !== reqId.current) return;
+        setHypotheses(h);
+        setHypParams(p);          // remember WHICH parameters these results belong to
+      })
       .catch((e) => id === reqId.current && setError((e as Error).message))
       .finally(() => id === reqId.current && setLoadingHyp(false));
+  }, []);
+
+  // Fetch the slower analyses (robustness grid + analytics). NOT the bootstrap.
+  const fetchSlow = useCallback((p: EngineParams, id: number) => {
+    setLoadingSlow(true);
     Promise.all([fetchRobustness(p), fetchAnalytics(p)])
       .then(([r, a]) => {
         if (id === reqId.current) {
@@ -212,6 +244,7 @@ export default function Page() {
       setAnalytics(null);
       setStep("results");
       fetchSlow(params, id);
+      runInference(params, id);        // once, for the initial configuration
     } catch (e) {
       if (id === reqId.current) setError((e as Error).message);
     } finally {
@@ -220,7 +253,7 @@ export default function Page() {
         setWaking(false);
       }
     }
-  }, [params, fetchSlow]);
+  }, [params, fetchSlow, runInference]);
 
   // Live re-tuning on the results screen (debounced).
   useEffect(() => {
@@ -357,6 +390,10 @@ export default function Page() {
       timeseries={timeseries}
       robustness={robustness}
       analytics={analytics}
+      hypStale={
+        hypotheses !== null && hypParams !== null && !sameInferenceInputs(params, hypParams)
+      }
+      onRunInference={() => runInference(params, ++reqId.current)}
       loadingFast={loadingFast}
       loadingHyp={loadingHyp}
       loadingSlow={loadingSlow}

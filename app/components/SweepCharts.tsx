@@ -1,12 +1,14 @@
 "use client";
 
-import type { SweepResponse } from "@/lib/types";
-import LineChart, { type Series } from "./LineChart";
+import type { SweepBootstrap, SweepResponse } from "@/lib/types";
+import LineChart, { type Band, type Series } from "./LineChart";
 import SectionPlaceholder from "./SectionPlaceholder";
 
 interface Props {
   data: SweepResponse | null;
   loading: boolean;
+  /** Data-level sweep bootstrap — supplies the confidence bands. */
+  boot?: SweepBootstrap | null;
 }
 
 const ACCENT = "var(--color-accent)";
@@ -57,8 +59,33 @@ function ChartFrame({
   );
 }
 
-export default function SweepCharts({ data, loading }: Props) {
+export default function SweepCharts({ data, loading, boot = null }: Props) {
   const pts = data?.points ?? [];
+
+  /** Build a band from the bootstrap result. `kind` picks pointwise vs simultaneous. */
+  const band = (key: string, kind: "pointwise" | "simultaneous", color: string,
+                opacity: number): Band | null => {
+    const b = boot?.bands?.[key];
+    if (!b) return null;
+    const lo = kind === "pointwise" ? b.pointwise_low : b.simultaneous_low;
+    const hi = kind === "pointwise" ? b.pointwise_high : b.simultaneous_high;
+    const points = boot!.shares
+      .map((x, i) => ({ x, lo: lo[i], hi: hi[i] }))
+      .filter((p): p is { x: number; lo: number; hi: number } => p.lo != null && p.hi != null);
+    return points.length > 1 ? { label: `${key}-${kind}`, color, opacity, points } : null;
+  };
+
+  // Simultaneous band drawn first (wider), pointwise on top — the visual point is
+  // that the simultaneous band still covers zero at low crypto shares while the
+  // pointwise one does not.
+  const deltaBands = [
+    band("d_mdd", "simultaneous", ACCENT, 0.10),
+    band("d_mdd", "pointwise", ACCENT, 0.20),
+  ].filter((b): b is Band => b !== null);
+  const sharpeBands = [
+    band("sharpe_vc", "simultaneous", ACCENT, 0.10),
+    band("sharpe_vc", "pointwise", ACCENT, 0.20),
+  ].filter((b): b is Band => b !== null);
 
   const deltaSeries: Series[] = [
     { label: "ΔMDD", color: ACCENT, points: pts.map((p) => ({ x: p.crypto_share, y: p.d_mdd })) },
@@ -87,13 +114,22 @@ export default function SweepCharts({ data, loading }: Props) {
         <div className="grid md:grid-cols-2 gap-5">
           <ChartFrame
             title="Risiko-Effekt der Vol-Control über die Krypto-Quote"
-            caption="ΔMDD und ΔCVaR = Vol-Control minus Buy-and-Hold. Positiv = mildere Verlustkennzahl."
+            caption={
+              deltaBands.length
+                ? "ΔMDD und ΔCVaR = Vol-Control minus Buy-and-Hold. Positiv = mildere Verlustkennzahl. " +
+                  `Flächen = Bootstrap-Konfidenz für ΔMDD (B = ${boot!.n_boot.toLocaleString("de-DE")}): ` +
+                  "dunkler = punktweise 95 %, heller = SIMULTAN über alle Quoten " +
+                  `(Faktor ${boot!.bands.d_mdd.simultaneous_factor.toFixed(2)} statt 1,96). ` +
+                  "Das simultane Band enthält bei niedrigen Quoten die Null, das punktweise nicht — " +
+                  "die Gesamtunsicherheit über die Kurve ist deutlich größer als je Einzelpunkt."
+                : "ΔMDD und ΔCVaR = Vol-Control minus Buy-and-Hold. Positiv = mildere Verlustkennzahl."
+            }
             legend={[
               { label: "ΔMDD", color: ACCENT },
               { label: "ΔCVaR", color: INK, dashed: true },
             ]}
           >
-            <LineChart series={deltaSeries} fmtX={fmtShare} fmtY={fmtPct} />
+            <LineChart series={deltaSeries} bands={deltaBands} fmtX={fmtShare} fmtY={fmtPct} />
           </ChartFrame>
 
           <ChartFrame
@@ -104,7 +140,7 @@ export default function SweepCharts({ data, loading }: Props) {
               { label: "Buy-and-Hold", color: GREY, dashed: true },
             ]}
           >
-            <LineChart series={sharpeSeries} fmtX={fmtShare} fmtY={fmtNum} />
+            <LineChart series={sharpeSeries} bands={sharpeBands} fmtX={fmtShare} fmtY={fmtNum} />
           </ChartFrame>
         </div>
       )}

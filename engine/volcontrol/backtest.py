@@ -253,9 +253,17 @@ def dsr_trial_returns(returns: pd.DataFrame, cfg: EngineConfig, crypto_share: fl
 
 def hypothesis_tests(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
                      crypto_share: float = 0.10, target_vol: float = 0.10,
-                     pit_builder=None, n_sweep_boot: int = 0) -> dict:
-    """H1 (MDD), H2 (Sharpe) via paired bootstrap; H3 (interaction) via HAC slope."""
-    run = run_strategies(returns, cfg, crypto_share, pit_builder)
+                     pit_builder=None, n_sweep_boot: int = 0,
+                     run=None, sweep_df=None, sweep_boot=None) -> dict:
+    """H1 (MDD), H2 (Sharpe) via paired bootstrap; H3 (interaction) via data-level slope.
+
+    `run`, `sweep_df` and `sweep_boot` accept ALREADY COMPUTED results so the API can
+    hand over what other panels produced instead of recomputing them. Passing None
+    reproduces the previous behaviour exactly — the inputs are identical objects, so
+    no number can move.
+    """
+    if run is None:
+        run = run_strategies(returns, cfg, crypto_share, pit_builder)
     bh = run["strategies"]["BuyHold"]["returns"].values
     vc = run["strategies"][f"VolControl_{int(target_vol*100)}"]["returns"].values
 
@@ -275,7 +283,8 @@ def hypothesis_tests(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
         cfg.bootstrap_n, cfg.expected_block, cfg.seed)
     wilcox = stx.wilcoxon_test(vc, bh)
 
-    sweep = crypto_sweep(returns, cfg, target_vol, pit_builder=pit_builder)
+    sweep = crypto_sweep(returns, cfg, target_vol, pit_builder=pit_builder) \
+        if sweep_df is None else sweep_df
     shares = sweep["crypto_share"].values
     h3_mdd = stx.hac_ols(shares, sweep["d_mdd"].values)
     h3_cvar = stx.hac_ols(shares, sweep["d_cvar"].values)
@@ -304,8 +313,8 @@ def hypothesis_tests(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
     # HAC-OLS slope over the share axis is near-tautological. When available, the
     # data-level slope is the CONFIRMATORY test for H3 and the HAC/Mann-Kendall
     # results move to a clearly marked supplementary block.
-    sboot = None
-    if n_sweep_boot > 0:
+    sboot = sweep_boot
+    if sboot is None and n_sweep_boot > 0:
         from . import sweepboot as sbm
         sboot = sbm.sweep_bootstrap(returns, cfg, target_vol, n_boot=n_sweep_boot,
                                     shares=shares)

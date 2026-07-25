@@ -39,6 +39,8 @@ interface Props {
   timeseries: TimeSeriesResponse | null;
   robustness: RobustnessResponse | null;
   analytics: AnalyticsResponse | null;
+  hypStale?: boolean;
+  onRunInference?: () => void;
   loadingFast: boolean;
   loadingHyp: boolean;
   loadingSlow: boolean;
@@ -66,6 +68,8 @@ export default function ResultsView({
   timeseries,
   robustness,
   analytics,
+  hypStale = false,
+  onRunInference,
   loadingFast,
   loadingHyp,
   loadingSlow,
@@ -166,11 +170,20 @@ export default function ResultsView({
           <div className="space-y-10 min-w-0">
             <MetricsTable data={backtest} loading={loadingFast} selectedTargetVol={params.target_vol} />
             <TimeSeriesSection data={timeseries} loading={loadingFast} />
-            <SweepCharts data={sweep} loading={loadingFast} />
+            <SweepCharts
+              data={sweep}
+              loading={loadingFast}
+              boot={hypotheses?.sweep_bootstrap ?? null}
+            />
             <RobustnessSection data={robustness} loading={loadingSlow} selectedTargetVol={params.target_vol} />
             <AnalyticsSection data={analytics} loading={loadingSlow} />
             <DescriptiveStats data={describe} loading={loadingFast} />
-            <HypothesesPanel data={hypotheses} loading={loadingHyp} />
+            <HypothesesPanel
+              data={hypotheses}
+              loading={loadingHyp}
+              stale={hypStale}
+              onRun={onRunInference}
+            />
             <InfoNotes
               fingerprint={backtest?.fingerprint ?? null}
               source={params.source}

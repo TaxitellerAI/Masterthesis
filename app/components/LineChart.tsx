@@ -15,8 +15,17 @@ export interface Series {
   dashed?: boolean;
 }
 
+/** A confidence band drawn BEHIND the lines. */
+export interface Band {
+  label: string;
+  color: string;
+  opacity?: number;
+  points: { x: number; lo: number; hi: number }[];
+}
+
 interface Props {
   series: Series[];
+  bands?: Band[];
   width?: number;
   height?: number;
   fmtX?: (x: number) => string;
@@ -30,6 +39,7 @@ const PAD = { top: 12, right: 14, bottom: 26, left: 52 };
 
 export default function LineChart({
   series,
+  bands = [],
   width: propWidth = 460,
   height = 240,
   fmtX = (x) => `${x}`,
@@ -43,7 +53,10 @@ export default function LineChart({
   // Render the viewBox at the container's real width so labels stay a constant size.
   const [boxRef, width] = useContainerWidth<HTMLDivElement>(propWidth);
 
-  const all = series.flatMap((s) => s.points);
+  const bandPts = bands.flatMap((b) =>
+    b.points.flatMap((p) => [{ x: p.x, y: p.lo }, { x: p.x, y: p.hi }]),
+  );
+  const all = [...series.flatMap((s) => s.points), ...bandPts];
   if (all.length === 0) {
     return <div ref={boxRef} className="text-faint text-sm py-10 text-center">Keine Daten</div>;
   }
@@ -148,6 +161,22 @@ export default function LineChart({
       )}
 
       {/* series */}
+      {/* Confidence bands first, so the lines stay readable on top of them. */}
+      {bands.map((b) => {
+        if (b.points.length < 2) return null;
+        const up = b.points.map((p) => `${sx(p.x)},${sy(p.hi)}`).join(" ");
+        const dn = [...b.points].reverse().map((p) => `${sx(p.x)},${sy(p.lo)}`).join(" ");
+        return (
+          <polygon
+            key={b.label}
+            points={`${up} ${dn}`}
+            fill={b.color}
+            fillOpacity={b.opacity ?? 0.14}
+            stroke="none"
+          />
+        );
+      })}
+
       {series.map((s, si) => {
         const d = s.points.map((p, i) => `${i === 0 ? "M" : "L"} ${sx(p.x).toFixed(2)} ${sy(p.y).toFixed(2)}`).join(" ");
         return (

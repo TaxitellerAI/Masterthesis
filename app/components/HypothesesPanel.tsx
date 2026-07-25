@@ -7,6 +7,9 @@ import SectionPlaceholder from "./SectionPlaceholder";
 interface Props {
   data: HypothesesResponse | null;
   loading: boolean;
+  /** Parameters moved since these results were computed. */
+  stale?: boolean;
+  onRun?: () => void;
 }
 
 // Flat significance tag driven by the FAMILY-WISE (Holm-adjusted) p-value.
@@ -25,7 +28,7 @@ function Tag({ p }: { p: number }) {
   );
 }
 
-export default function HypothesesPanel({ data, loading }: Props) {
+export default function HypothesesPanel({ data, loading, stale = false, onRun }: Props) {
   return (
     <section>
       <div className="flex items-baseline justify-between mb-3">
@@ -35,8 +38,31 @@ export default function HypothesesPanel({ data, loading }: Props) {
         </span>
       </div>
 
+      {/* The data-level bootstrap costs ~7 s, so it is NOT tied to slider drags.
+          When the parameters move away from the computed results, say so and offer
+          an explicit recompute rather than showing figures for another setting. */}
+      {(stale || (!data && !loading)) && (
+        <div className="mb-3 border px-4 py-2.5 flex items-center justify-between gap-4 text-xs"
+             style={{ borderColor: stale ? "var(--color-neg)" : "var(--color-hairline)" }}>
+          <span style={{ color: stale ? "var(--color-neg)" : "var(--color-muted)" }}>
+            {stale
+              ? "Parameter geändert — die gezeigten Testergebnisse gehören zur vorherigen Konfiguration."
+              : "Inferenz noch nicht berechnet."}
+          </span>
+          {onRun && (
+            <button
+              onClick={onRun}
+              disabled={loading}
+              className="px-3 py-1 border border-ink bg-ink text-paper hover:bg-transparent hover:text-ink transition-colors disabled:opacity-40 whitespace-nowrap"
+            >
+              {loading ? "Rechnet…" : "Inferenz neu berechnen"}
+            </button>
+          )}
+        </div>
+      )}
+
       {!data && (
-        <SectionPlaceholder loading={loading} label="Hypothesentests laufen (Bootstrap)…" height={220} />
+        <SectionPlaceholder loading={loading} label="Hypothesentests laufen (Bootstrap, B = 1.000)…" height={220} />
       )}
 
       {data && (

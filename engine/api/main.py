@@ -350,18 +350,40 @@ def sweep(req: RunRequest):
 
 
 _sweepboot_cache: dict[tuple, dict] = {}
+_CACHE_MAX = 24
 
 
-@app.post("/sweepbootstrap")
-def sweepbootstrap(req: RunRequest):
-    """H3/TF4 inference on the DATA level — bootstraps the whole sweep.
+def _analysis_key(req: RunRequest, rets: pd.DataFrame, cfg: EngineConfig) -> tuple:
+    """Cache key covering the DATA and EVERY setting that can move the numbers.
 
-    Cached per (scenario, share grid, target vol, rf mode, B): B = 1000 costs ~8 s,
-    which is fine once but not on every slider nudge.
+    A cache keyed on a subset would be worse than a slow endpoint: it could serve
+    figures from a different target volatility or risk-free treatment. The data hash
+    pins the sample; the rest pins the model. `crypto_share` is deliberately absent —
+    the sweep bootstrap varies the share itself and does not read it (verified by the
+    signature of sweep_bootstrap), so including it would only cause needless misses.
     """
-    rets, cfg, _, spec, sample_report, pit = _prepared(req)
-    key = (req.scenario, req.source, req.start, req.end, req.target_vol,
-           _rf_mode(req), req.base_currency, SWEEP_BOOT_N)
+    return (
+        fingerprint(rets)["hash"],
+        req.scenario, req.source, req.start, req.end, req.base_currency,
+        round(float(req.target_vol), 10),
+        _rf_mode(req), round(float(cfg.rf_annual), 12), cfg.rf_convention,
+        req.vol_method, req.rebalance, round(float(req.dead_band), 10),
+        cfg.weight_rebalance, cfg.lookback, cfg.trading_days, cfg.max_leverage,
+        cfg.ewma_halflife, cfg.cost_traditional_bps, cfg.cost_crypto_bps,
+        cfg.cvar_alpha, cfg.expected_block, cfg.seed,
+        cfg.sweep_max_share, cfg.sweep_step,
+        tuple(sorted((req.trad_weights or {}).items())),
+        sm_sweepboot.CRITERION_PRIMARY, SWEEP_BOOT_N,
+    )
+
+
+def _sweep_boot_cached(req: RunRequest, rets, cfg, sample_report) -> dict:
+    """One shared, correctly keyed sweep-bootstrap result for ALL endpoints.
+
+    /hypotheses used to recompute this even though /sweepbootstrap had just cached
+    it — 6.9 s of the 8.9 s total, recomputed for nothing.
+    """
+    key = _analysis_key(req, rets, cfg)
     hit = _sweepboot_cache.get(key)
     if hit is None:
         t0 = time.time()
@@ -369,15 +391,25 @@ def sweepbootstrap(req: RunRequest):
                                            n_boot=SWEEP_BOOT_N, seed=cfg.seed)
         hit["runtime_seconds"] = round(time.time() - t0, 2)
         hit["sample"] = sample_report
+        if len(_sweepboot_cache) >= _CACHE_MAX:      # bounded, FIFO
+            _sweepboot_cache.pop(next(iter(_sweepboot_cache)))
         _sweepboot_cache[key] = hit
     return hit
+
+
+@app.post("/sweepbootstrap")
+def sweepbootstrap(req: RunRequest):
+    """H3/TF4 inference on the DATA level — bootstraps the whole sweep (B = 1000)."""
+    rets, cfg, _, spec, sample_report, pit = _prepared(req)
+    return _sweep_boot_cached(req, rets, cfg, sample_report)
 
 
 @app.post("/hypotheses")
 def hypotheses(req: RunRequest):
     rets, cfg, _, spec, sample_report, pit = _prepared(req, bootstrap_n=1200)   # smaller default for API latency (free-tier CPU)
+    sboot = _sweep_boot_cached(req, rets, cfg, sample_report)
     res = hypothesis_tests(rets, cfg, req.crypto_share, req.target_vol,
-                           pit_builder=pit, n_sweep_boot=SWEEP_BOOT_N)
+                           pit_builder=pit, sweep_boot=sboot)
     res = {k: (v if k != "sweep" else v.round(5).to_dict(orient="records"))
            for k, v in res.items()}
     return res
