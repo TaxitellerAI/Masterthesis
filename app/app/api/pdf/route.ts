@@ -423,7 +423,12 @@ export async function POST(req: NextRequest) {
     { x: M, y: footY + 10, size: 7.5, font: sans, color: MUTED },
   );
   const fp = snapshot.backtest?.fingerprint;
-  const fpTxt = fp ? `Daten-Hash ${fp.hash} · Fenster ${fp.start}–${fp.end} · ` : "";
+  // Two distinctly named anchors — a report that calls two different values "Hash"
+  // cannot be defended. Both are environment-stable.
+  const fpTxt = fp
+    ? `Datensatz-Hash ${fp.dataset_hash ?? "—"} · Lauf-Hash ${fp.run_hash ?? fp.hash} · ` +
+      `Fenster ${fp.start}–${fp.end} · `
+    : "";
   draw(
     `${fpTxt}Kein Anlageratschlag. Alle Kennzahlen werden ausschließlich von der Python-Engine berechnet.`,
     { x: M, y: footY, size: 7.5, font: sans, color: MUTED },

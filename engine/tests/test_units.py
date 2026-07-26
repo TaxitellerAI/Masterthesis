@@ -592,7 +592,13 @@ def test_stable_hash_survives_one_ulp_but_catches_real_change():
     ulp = r.copy()
     ulp.iloc[0, 0] = np.nextafter(ulp.iloc[0, 0], 1.0)     # one ULP up
     assert stable_data_hash(ulp) == h0                      # stable key survives
-    assert fingerprint(ulp)["hash"] != fingerprint(r)["hash"]   # exact hash does not
+    # The REPORTED hashes are the stable ones and must survive too — a report printed
+    # on Linux must cite the same anchors as one printed on macOS.
+    assert fingerprint(ulp)["hash"] == fingerprint(r)["hash"]
+    assert fingerprint(ulp)["dataset_hash"] == fingerprint(r)["dataset_hash"]
+    assert fingerprint(ulp)["run_hash"] == fingerprint(r)["run_hash"]
+    # only the byte-exact digest, kept for traceability, reacts to the last bit
+    assert fingerprint(ulp)["hash_exact"] != fingerprint(r)["hash_exact"]
 
     real = r.copy()
     real.iloc[0, 0] += 1e-9                                 # a REAL change

@@ -134,10 +134,18 @@ export default function SweepCharts({ data, loading, boot = null }: Props) {
 
           <ChartFrame
             title="Sharpe-Verläufe über die Krypto-Quote"
-            caption="Sharpe der statischen und der volatilitätsgesteuerten Variante je Krypto-Anteil."
+            caption={
+              sharpeBands.length
+                ? "Sharpe der statischen und der volatilitätsgesteuerten Variante je Krypto-Anteil. " +
+                  "Die Flächen sind das Bootstrap-Konfidenzband der VOL-CONTROL-Sharpe " +
+                  "(dunkler = punktweise 95 %, heller = simultan über alle Quoten) — deshalb " +
+                  "reicht die Achse deutlich über die Punktschätzungen hinaus."
+                : "Sharpe der statischen und der volatilitätsgesteuerten Variante je Krypto-Anteil."
+            }
             legend={[
               { label: "Vol-Control", color: ACCENT },
               { label: "Buy-and-Hold", color: GREY, dashed: true },
+              ...(sharpeBands.length ? [{ label: "KI Vol-Control", color: ACCENT }] : []),
             ]}
           >
             <LineChart series={sharpeSeries} bands={sharpeBands} fmtX={fmtShare} fmtY={fmtNum} />

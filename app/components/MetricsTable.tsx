@@ -14,6 +14,17 @@ export default function MetricsTable({ data, loading, selectedTargetVol }: Props
   const selectedKey = `VolControl_${Math.round(selectedTargetVol * 100)}`;
   // Flag rows that do NOT span the full sample, so a shorter series is never
   // silently compared against the others.
+  // Read the ACTIVE conventions from the engine response. Hard-coded captions have
+  // repeatedly gone stale in this project (3M-EURIBOR, "59 % negative Tage",
+  // "Datensatz: Synthetisch") — the rebalancing grid is the same trap.
+  const conv = data?.conventions;
+  const REB: Record<string, string> = {
+    daily: "täglichem", monthly: "monatlichem", quarterly: "quartalsweisem",
+    weekly: "wöchentlichem",
+  };
+  const wReb = conv ? (REB[conv.weight_rebalance] ?? conv.weight_rebalance) : null;
+  const eReb = conv ? (REB[conv.exposure_rebalance] ?? conv.exposure_rebalance) : null;
+
   const maxN = Math.max(0, ...(data?.metrics ?? []).map((m) => m.observations ?? 0));
   const shortSample = (m: { observations?: number | null }) =>
     maxN > 0 && (m.observations ?? maxN) < maxN;
@@ -105,19 +116,29 @@ export default function MetricsTable({ data, loading, selectedTargetVol }: Props
         </table>
       </div>
       <p className="text-faint text-xs mt-2">
-        <strong>Turnover</strong> ist für alle gewichtsbasierten Strategien real gerechnet (Σ|Δ Gewicht|)
-        und mit denselben Kostensätzen belastet wie die Vol-Control; nur <strong>True BH (Drift)</strong>
-        hat echte Null. Ausgewiesen sind Netto-Kennzahlen — die Brutto-Sharpe (ohne Kosten) steht im
-        Tooltip der Turnover-Spalte. <strong>n</strong> = Handelstage je Strategie; orange markierte
-        Zeilen laufen auf einem <em>kürzeren</em> Fenster (Risk-Parity verwirft eine Warm-up-Phase)
-        und sind daher nur eingeschränkt direkt vergleichbar.
+        <strong>Turnover</strong> ist je Strategietyp unterschiedlich definiert — beides ist
+        eine Handelsmenge, aber nicht dieselbe Größe:{" "}
+        <strong>gewichtsbasierte Strategien</strong> (Buy-and-Hold, 60/40, Risk-Parity) werden
+        über die kumulierte Gewichtsänderung Σ|Δ Gewicht| gerechnet;{" "}
+        <strong>Vol-Control</strong> über die kumulierte Änderung der Investitionsquote
+        Σ|Δ Exposure|. Beide werden mit denselben Kostensätzen belastet
+        {conv ? ` (${conv.cost_traditional_bps} bp traditionell, ${conv.cost_crypto_bps} bp Krypto)` : ""};
+        nur <strong>True BH (Drift)</strong> hat eine echte Null, weil dort einmal gekauft und
+        nie wieder gehandelt wird. Ausgewiesen sind Netto-Kennzahlen — die Brutto-Sharpe
+        (ohne Kosten) steht im Tooltip der Turnover-Spalte.
         <br />
-        Blau = gewählte Zielvolatilität; kursiv = alternative Benchmarks. Rot = gesetztes Risiko-Limit
-        überschritten. <strong>Buy-and-Hold</strong> ist als Constant-Mix implementiert (feste Gewichte
-        ≙ tägliches Rebalancing auf die Zielallokation); <strong>True BH (Drift)</strong> = einmalige
-        Anlage ohne Rebalancing, Gewichte driften. <strong>Rendite p.a.</strong> arithmetisch,{" "}
-        <strong>CAGR</strong> geometrisch (kompoundiert). Turnover = Σ|Δ Exposure|. Werte aus{" "}
-        <code>backtest</code> der Engine.
+        <strong>n</strong> = Handelstage je Strategie; orange markierte Zeilen laufen auf einem{" "}
+        <em>kürzeren</em> Fenster (Risk-Parity verwirft eine Warm-up-Phase) und sind daher nur
+        eingeschränkt direkt vergleichbar.
+        <br />
+        Blau = gewählte Zielvolatilität; kursiv = alternative Benchmarks. Rot = gesetztes
+        Risiko-Limit überschritten. <strong>Buy-and-Hold</strong> ist als Constant-Mix
+        implementiert{wReb ? ` mit ${wReb} Rebalancing der Basisgewichte` : ""}; zwischen den
+        Terminen driften die Gewichte mit der Wertentwicklung.
+        {eReb ? ` Die Vol-Control handelt ihr Exposure auf ${eReb} Raster und setzt auf genau dieser Basisreihe auf.` : ""}{" "}
+        <strong>True BH (Drift)</strong> = einmalige Anlage ohne Rebalancing.{" "}
+        <strong>Rendite p.a.</strong> arithmetisch, <strong>CAGR</strong> geometrisch
+        (kompoundiert). Werte aus <code>backtest</code> der Engine.
       </p>
     </section>
   );

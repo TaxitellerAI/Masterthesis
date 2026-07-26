@@ -31,6 +31,12 @@ function corrShade(v: number): string {
 }
 
 export default function DescriptiveStats({ data, loading }: Props) {
+  // The calendar panel spans the FULL available history — it showed 2014-2017 while
+  // the note above claimed sample scope. Years outside the active sample are now
+  // marked, and the block is labelled for what it is.
+  const sy = data?.scope?.sample_years ?? null;
+  const inSample = (y: number) => (sy ? y >= sy[0] && y <= sy[1] : true);
+  const partial = new Set(data?.scope?.partial_years ?? []);
   return (
     <section>
       <div className="flex items-baseline justify-between mb-3">
@@ -120,7 +126,16 @@ export default function DescriptiveStats({ data, loading }: Props) {
           {/* Calendar-year returns per asset */}
           {data.calendar?.yearly?.length > 0 && (
             <div>
-              <div className="eyebrow mb-2">Jahresrenditen je Asset</div>
+              <div className="flex items-baseline justify-between mb-2 gap-4">
+                <span className="eyebrow">
+                  Jahresrenditen je Asset — volle verfügbare Historie
+                </span>
+                {sy && (
+                  <span className="text-faint text-xs nums">
+                    Sample-Fenster {sy[0]}–{sy[1]}
+                  </span>
+                )}
+              </div>
               <div className="border border-hairline bg-paper overflow-x-auto card-hover">
                 <table className="text-xs nums w-full">
                   <thead>
@@ -134,9 +149,20 @@ export default function DescriptiveStats({ data, loading }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.calendar.yearly.map((row) => (
-                      <tr key={row.year} className="border-b border-hairline last:border-0 row-hover">
-                        <td className="px-3 py-1.5 text-left text-faint font-semibold">{row.year}</td>
+                    {data.calendar.yearly.map((row) => {
+                      const outside = !inSample(row.year);
+                      return (
+                      <tr key={row.year}
+                          className="border-b border-hairline last:border-0 row-hover"
+                          style={outside ? { opacity: 0.45 } : undefined}
+                          title={outside
+                            ? "Jahr liegt AUSSERHALB des aktiven Sample-Fensters — Einordnung, nicht Datenbasis der Ergebnisse."
+                            : partial.has(row.year) ? "Nur teilweise im Sample-Fenster." : undefined}>
+                        <td className="px-3 py-1.5 text-left text-faint font-semibold whitespace-nowrap">
+                          {row.year}
+                          {outside && <span className="ml-1">*</span>}
+                          {!outside && partial.has(row.year) && <span className="ml-1">†</span>}
+                        </td>
                         {data.calendar.assets.map((a) => {
                           const v = row[a] as number | null;
                           return (
@@ -157,13 +183,24 @@ export default function DescriptiveStats({ data, loading }: Props) {
                           );
                         })}
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
               <p className="text-faint text-xs mt-1.5">
-                Kompoundierte Kalenderjahr-Renditen je Asset (nativer Kalender); Grundlage auch für
-                „seit Jahr X"-Fragen an The Desk.
+                Kompoundierte Kalenderjahr-Renditen je Asset auf dem nativen Kalender. Dieser Block
+                zeigt bewusst die <strong>volle verfügbare Historie</strong> — er ist Einordnung und
+                Grundlage für „seit Jahr X"-Fragen, <em>nicht</em> die Datenbasis der Ergebnisse.
+                {sy && (
+                  <>
+                    {" "}Mit <strong>*</strong> markierte Jahre liegen vollständig
+                    <em> außerhalb</em> des aktiven Sample-Fensters ({sy[0]}–{sy[1]})
+                    {partial.size > 0 && (
+                      <>, mit <strong>†</strong> markierte nur teilweise darin</>
+                    )}.
+                  </>
+                )}
               </p>
             </div>
           )}

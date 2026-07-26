@@ -308,8 +308,7 @@ export default function HypothesesPanel({
       )}
       <p className="text-faint text-xs mt-2 leading-snug">
         Signifikanz auf Basis der <strong>Holm-korrigierten</strong> p-Werte (family-wise error). H1/H2:
-        stationärer Block-Bootstrap mit BCa-Intervall. H3 mit drei robusten Verfahren (HAC-OLS,
-        Mann-Kendall-Trend, Pair-Resampling-Steigung). Werte aus <code>hypotheses</code> der Engine.
+        stationärer Block-Bootstrap mit BCa-Intervall. H3 ist konfirmatorisch die Steigung auf DATENEBENE (Bootstrap des gesamten Sweeps); HAC-OLS, Mann-Kendall und Pair-Resampling laufen auf Sweep-Ebene und werden nur ergänzend berichtet. Werte aus <code>hypotheses</code> der Engine.
       </p>
     </section>
   );

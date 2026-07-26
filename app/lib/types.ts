@@ -25,7 +25,14 @@ export interface MetricRow {
 }
 
 export interface Fingerprint {
+  /** Primary, ENVIRONMENT-STABLE run hash (data + configuration). */
   hash: string;
+  /** Vouches for the DATA alone. */
+  dataset_hash?: string;
+  /** Vouches for data AND configuration — same value as `hash`. */
+  run_hash?: string;
+  /** Byte-exact but machine-dependent; traceability only, never cite this. */
+  hash_exact?: string;
   rows: number;
   columns: string[];
   start: string | null;
@@ -64,9 +71,21 @@ export interface RfInfo {
   } | null;
 }
 
+/** Active computation conventions — captions read these instead of hard-coding. */
+export interface Conventions {
+  weight_rebalance: "daily" | "monthly" | "quarterly";
+  exposure_rebalance: "daily" | "weekly" | "monthly";
+  vol_method: "rolling" | "ewma";
+  dead_band: number;
+  cost_traditional_bps: number;
+  cost_crypto_bps: number;
+  trading_days: number;
+}
+
 export interface BacktestResponse {
   crypto_share: number;
   metrics: MetricRow[];
+  conventions?: Conventions;
   sample: SampleReport | null;
   sleeve: SleeveInfo | null;
   limits: { mdd_limit: number | null; cvar_limit: number | null };
@@ -388,6 +407,10 @@ export interface DescribeResponse {
     end: string;
     observations: number;
     partial_years: number[];
+    /** [firstYear, lastYear] of the ACTIVE sample — years outside are context only. */
+    sample_years?: [number, number];
+    n_price_rows?: number | null;
+    n_return_days?: number;
     note: string;
   };
   /** Full native history per asset — context only, NOT the basis of the results. */

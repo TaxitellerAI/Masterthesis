@@ -56,7 +56,7 @@ function buildNotes(negTxt: string | null): { title: string; body: string }[] { 
   {
     title: "Untersuchungszeitraum & Reproduzierbarkeit",
     body:
-      "Das Datenfenster ist mit festen Kalendergrenzen definiert (01.01.2018 – 31.12.2025, acht volle Jahre), nicht als rollierendes 'letzte N Jahre' — sonst lieferte jeder Abruf einen anderen Datenstand und keine berichtete Zahl wäre zitierfähig. 2018 ist zugleich das erste Jahr mit vollständiger Historie aller Default-Kryptowerte. Kurse und Zinsreihe sind als Snapshot eingefroren; der Fingerprint-Hash umfasst Fenstergrenzen, Datenquelle und Zinsmodus, sodass zwei Läufe mit unterschiedlichen Annahmen nie denselben Hash tragen.",
+      "Das Datenfenster ist mit festen Kalendergrenzen definiert (01.01.2018 – 31.12.2025, acht volle Jahre), nicht als rollierendes 'letzte N Jahre' — sonst lieferte jeder Abruf einen anderen Datenstand und keine berichtete Zahl wäre zitierfähig. 2018 ist zugleich das erste Jahr mit vollständiger Historie aller Default-Kryptowerte. Kurse und Zinsreihe sind als Snapshot eingefroren. Ausgewiesen werden ZWEI Anker: der Datensatz-Hash bürgt für die Datenbasis allein, der Lauf-Hash zusätzlich für Fenstergrenzen, Datenquelle, Zinsmodus und Gewichte — zwei Läufe mit unterschiedlichen Annahmen können also nie denselben Lauf-Hash tragen. Beide sind auf 1e-12 quantisiert und damit plattformunabhängig reproduzierbar (der byte-exakte Digest unterscheidet sich zwischen macOS und Linux um ein letztes Bit und taugt deshalb nicht als zitierfähiger Wert).",
   },
   {
     title: "Survivorship-Bias im Krypto-Universum",
@@ -150,8 +150,21 @@ export default function InfoNotes({
         )}
         {fingerprint && (
           <>
+            {/* TWO distinct anchors, distinctly named. A report that calls two
+                different values "Hash" is an open flank in the colloquium. Both are
+                environment-stable; the byte-exact digest is machine-dependent and is
+                therefore no longer shown as the citable value. */}
             <span>
-              Daten-Hash <span className="text-ink">{fingerprint.hash}</span>
+              Datensatz-Hash{" "}
+              <span className="text-ink" title="Bürgt für die Datenbasis allein (Kurse/Renditen).">
+                {fingerprint.dataset_hash ?? "—"}
+              </span>
+            </span>
+            <span>
+              Lauf-Hash{" "}
+              <span className="text-ink" title="Bürgt für Datenbasis UND Konfiguration (Szenario, Fenster, Zinsmodus …).">
+                {fingerprint.run_hash ?? fingerprint.hash}
+              </span>
             </span>
             <span>
               Fenster <span className="text-ink">{fingerprint.start}</span> – <span className="text-ink">{fingerprint.end}</span>
@@ -171,7 +184,9 @@ export default function InfoNotes({
       </div>
       <p className="text-faint text-xs mt-2 leading-snug">
         Diese Punkte sind Diskussions-/Annahme-Hinweise für die schriftliche Arbeit — keine berechneten
-        Ergebnisse. Der Daten-Hash bindet einen Report an den exakten Datensatz; der{" "}
+        Ergebnisse. Der <strong>Datensatz-Hash</strong> bürgt für die Datenbasis allein, der{" "}
+        <strong>Lauf-Hash</strong> zusätzlich für die Konfiguration (Szenario, Fenster,
+        Zinsmodus, Gewichte). Beide sind plattformunabhängig reproduzierbar; der{" "}
         <strong>Datensatz-Export</strong> friert die verwendeten Kurse als CSV ein (Hash im Dateinamen)
         und der <strong>Konfigurations-Link</strong> stellt genau diese Auswertung wieder her. Für die
         vollständige Nachvollziehbarkeit steht zudem der <strong>Excel-Export</strong> bereit: alle

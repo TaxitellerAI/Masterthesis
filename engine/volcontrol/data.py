@@ -263,8 +263,23 @@ def fingerprint(returns: pd.DataFrame, spec: dict | None = None) -> dict:
     h.update(arr.tobytes())
     h.update(repr(sorted((spec or {}).items())).encode("utf-8"))
     idx = returns.dropna(how="all").index
+    # Two clearly separated, ENVIRONMENT-STABLE identifiers plus the byte-exact one:
+    #   dataset_hash — vouches for the DATA alone
+    #   run_hash     — vouches for data AND configuration (scenario, window, rf mode …)
+    #   hash_exact   — byte-exact, but machine-dependent (verified: the same data gives
+    #                  ...587 on Linux/OpenBLAS and ...598 on macOS/Accelerate, which
+    #                  changes the digest completely). Kept for traceability only; it
+    #                  must never be the value a thesis cites.
+    import hashlib as _hl
+    d_hash = stable_data_hash(returns)
+    r_hash = _hl.sha256(
+        (d_hash + repr(sorted((spec or {}).items()))).encode("utf-8")
+    ).hexdigest()[:16]
     out = {
-        "hash": h.hexdigest()[:16],
+        "hash": r_hash,               # primary, stable: the run hash
+        "dataset_hash": d_hash,
+        "run_hash": r_hash,
+        "hash_exact": h.hexdigest()[:16],
         "rows": int(len(returns)),
         "columns": list(map(str, returns.columns)),
         "start": str(idx.min().date()) if len(idx) else None,

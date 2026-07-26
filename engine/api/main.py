@@ -394,6 +394,17 @@ def backtest(req: RunRequest):
         "sample": sample_report,
         "sleeve": run.get("sleeve"),
         "limits": {"mdd_limit": req.mdd_limit, "cvar_limit": req.cvar_limit},
+        # Active conventions, so no caption has to hard-code them. Hard-coded texts
+        # have been a repeat source of wrong labels in this project.
+        "conventions": {
+            "weight_rebalance": cfg.weight_rebalance,
+            "exposure_rebalance": cfg.rebalance,
+            "vol_method": cfg.vol_method,
+            "dead_band": cfg.dead_band,
+            "cost_traditional_bps": cfg.cost_traditional_bps,
+            "cost_crypto_bps": cfg.cost_crypto_bps,
+            "trading_days": cfg.trading_days,
+        },
         "fingerprint": fingerprint(rets, _spec_with_effective(req, sample_report)),
         "rf": {"mode": _rf_mode(req), "effective_annual": cfg.rf_annual, "estr": rf_info},
     }
