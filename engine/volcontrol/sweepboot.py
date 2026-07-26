@@ -32,6 +32,30 @@ Documented simplifications (they matter for the write-up)
     dead band. Both are calendar-based rules that are undefined on a shuffled index.
     If the active config sets a non-daily rebalance or a dead band, that is reported
     in the result so the deviation is never silent.
+  * The BASE portfolio is rebalanced daily and gross, while the primary specification
+    rebalances monthly and net. Slope on the primary spec: 0.753635 against 0.709898
+    here (S1). This deviation is deliberate — see below.
+
+Why not a position-based rebalancing grid
+-----------------------------------------
+The obvious repair is to replace the calendar month by "every 21 observations",
+which IS well-defined on a resampled path and matches the calendar frequency
+(S1: 95 calendar rebalancings, mean spacing 20.94 rows). It was measured and
+REJECTED. Same frequency, same net costs, same rf convention, only the grid
+differs — and the slope lands at 0.703713 instead of the calendar 0.742462.
+Worse, the result depends on the PHASE of the grid: sweeping the offset over all
+21 possible starting rows moves the slope from 0.578070 to 0.817021 — a spread of
+0.238951, which is 41 % of the width of the reported bootstrap CI, and far larger
+than the daily-vs-monthly gap the grid was meant to close. With only ~95 rebalancing
+events over 2010 rows, WHICH rows carry them dominates; the frequency does not pin
+the estimate down. Picking one offset would introduce a researcher degree of freedom
+of the same order as the effect under test. Averaging over phases would be a
+different estimator again.
+
+So the deviation stays and is labelled instead: the estimator is internally
+consistent (point estimate and all replicates use the identical rule), and the
+primary specification's 0.753635 lies well inside the reported CI [0.383607;
+0.965290].
 """
 from __future__ import annotations
 import numpy as np

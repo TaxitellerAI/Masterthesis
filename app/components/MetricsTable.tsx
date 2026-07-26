@@ -54,7 +54,7 @@ export default function MetricsTable({ data, loading, selectedTargetVol }: Props
               <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap cursor-help"
                   title="Conditional Value-at-Risk (95 %) — erwarteter Verlust in den schlechtesten 5 % der Tage.">CVaR 95 %</th>
               <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap cursor-help"
-                  title="Turnover — kumulierte Σ|Δ Gewicht| bzw. Σ|Δ Exposure|. Constant-Mix und Risk-Parity handeln tatsächlich; nur True BH (Drift) hat echte Null.">Turnover</th>
+                  title="Turnover — gesamte gehandelte Menge, für alle Strategien gleich definiert: kumulierte Σ|Δ Gewicht| des Portfolios. Bei Vol-Control ist das die Summe aus Exposure-Handel und dem anteiligen Handel des Basisportfolios (Aufschlüsselung im Zellen-Tooltip). Nur True BH (Drift) hat echte Null.">Turnover</th>
               <th className="text-right font-semibold px-3 py-2.5 eyebrow whitespace-nowrap cursor-help"
                   title="Anzahl Handelstage dieser Strategie. Risk-Parity verwirft eine Warm-up-Phase und läuft daher auf einem kürzeren Sample.">n</th>
             </tr>
@@ -101,7 +101,13 @@ export default function MetricsTable({ data, loading, selectedTargetVol }: Props
                     {pct(m.cvar_95)}
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-faint"
-                      title={m.sharpe_gross != null ? `Sharpe brutto (ohne Kosten): ${num(m.sharpe_gross, 3)}` : undefined}>
+                      title={[
+                        m.turnover_exposure != null && m.turnover_sleeve != null
+                          ? `Davon Exposure-Handel ${num(m.turnover_exposure, 1)}, ` +
+                            `anteiliger Handel des Basisportfolios ${num(m.turnover_sleeve, 1)}`
+                          : null,
+                        m.sharpe_gross != null ? `Sharpe brutto (ohne Kosten): ${num(m.sharpe_gross, 3)}` : null,
+                      ].filter(Boolean).join(" · ") || undefined}>
                     {m.turnover > 0 ? num(m.turnover, 1) : "0,0"}
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-faint"
@@ -116,12 +122,16 @@ export default function MetricsTable({ data, loading, selectedTargetVol }: Props
         </table>
       </div>
       <p className="text-faint text-xs mt-2">
-        <strong>Turnover</strong> ist je Strategietyp unterschiedlich definiert — beides ist
-        eine Handelsmenge, aber nicht dieselbe Größe:{" "}
-        <strong>gewichtsbasierte Strategien</strong> (Buy-and-Hold, 60/40, Risk-Parity) werden
-        über die kumulierte Gewichtsänderung Σ|Δ Gewicht| gerechnet;{" "}
-        <strong>Vol-Control</strong> über die kumulierte Änderung der Investitionsquote
-        Σ|Δ Exposure|. Beide werden mit denselben Kostensätzen belastet
+        <strong>Turnover</strong> ist für alle Strategien gleich definiert: die gesamte
+        kumulierte Gewichtsänderung Σ|Δ Gewicht| des Portfolios.{" "}
+        <strong>Vol-Control handelt auf zwei Ebenen</strong> — sie verändert die
+        Investitionsquote (Σ|Δ Exposure|) und trägt zugleich ihren Anteil an der
+        Umschichtung des Basisportfolios (Exposure × Sleeve-Turnover). Ausgewiesen ist die
+        Summe beider; die Aufteilung steht im Tooltip der jeweiligen Zelle. Zuvor stand hier
+        nur die Exposure-Komponente — eine echte Teilmenge des tatsächlichen Handels, die
+        Vol-Control fälschlich als die handelsärmere Strategie erscheinen ließ. Die Kosten
+        waren stets auf beiden Ebenen belastet, die Kennzahlen ändern sich durch die
+        korrigierte Ausweisung also nicht. Alle Strategien werden mit denselben Kostensätzen belastet
         {conv ? ` (${conv.cost_traditional_bps} bp traditionell, ${conv.cost_crypto_bps} bp Krypto)` : ""};
         nur <strong>True BH (Drift)</strong> hat eine echte Null, weil dort einmal gekauft und
         nie wieder gehandelt wird. Ausgewiesen sind Netto-Kennzahlen — die Brutto-Sharpe

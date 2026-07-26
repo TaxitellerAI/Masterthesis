@@ -76,7 +76,7 @@ def run_strategies(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
         port = port_gross - bh_cost
         weights = {c: round(float(W[c].iloc[-1]), 6) for c in W.columns}
 
-    def _summ(series, gross=None, turnover=0.0):
+    def _summ(series, gross=None, turnover=0.0, turnover_parts=None):
         # rf is aligned to each strategy's OWN calendar (they differ in length
         # after warm-up/dropna), so every metric uses the rate that truly applied.
         out = mt.summary(series.values, cfg.rf_for(series.index),
@@ -88,6 +88,12 @@ def run_strategies(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
         out["start"] = str(series.index.min().date()) if len(series) else None
         out["end"] = str(series.index.max().date()) if len(series) else None
         out["turnover"] = float(turnover)
+        # Vol-control trades on TWO levels; reporting only one made it look like the
+        # lower-turnover strategy when it is in fact the higher one. The parts stay
+        # visible so the headline figure can be taken apart.
+        if turnover_parts is not None:
+            out["turnover_exposure"] = float(turnover_parts[0])
+            out["turnover_sleeve"] = float(turnover_parts[1])
         if gross is not None:      # keep the cost effect visible, never silently net
             g = mt.summary(gross.values, cfg.rf_for(gross.index),
                            cfg.trading_days, cfg.cvar_alpha)
@@ -108,10 +114,21 @@ def run_strategies(returns: pd.DataFrame, cfg: EngineConfig = EngineConfig(),
             cfg.max_leverage, cost_bps, cfg.vol_method, cfg.ewma_halflife,
             cfg.rebalance, cfg.dead_band,
         )
+        # Like-for-like turnover. A vol-control strategy trades twice over: it moves
+        # the investment ratio (|d exposure|) AND it carries its share of the base
+        # portfolio's own rebalancing (exposure_t x sleeve turnover_t). Reporting
+        # only the first understated it against Buy-and-Hold, whose column counts the
+        # full sleeve turnover — the table then read as "vol control trades less",
+        # which is the opposite of the truth. Costs were always charged on both legs
+        # (the base series is already net of bh_cost, vol_control charges cost_bps on
+        # the exposure change), so this changes the REPORTED figure only.
+        exp_turn = float(exposure.diff().abs().sum())
+        sleeve_turn = float((bh_turn * exposure.reindex(bh_turn.index).fillna(0.0)).sum())
         out["strategies"][f"VolControl_{int(tv*100)}"] = {
             "returns": strat,
             "exposure": exposure,
-            **_summ(strat, turnover=float(exposure.diff().abs().sum())),
+            **_summ(strat, turnover=exp_turn + sleeve_turn,
+                    turnover_parts=(exp_turn, sleeve_turn)),
         }
 
     # --- comparators ---
@@ -156,6 +173,8 @@ def metrics_table(run_result: dict) -> pd.DataFrame:
             "max_drawdown": d["max_drawdown"],
             "cvar_95": d["cvar_95"],
             "turnover": d.get("turnover", 0.0),
+            "turnover_exposure": d.get("turnover_exposure"),
+            "turnover_sleeve": d.get("turnover_sleeve"),
             "observations": d.get("observations"),
             "start": d.get("start"),
             "end": d.get("end"),

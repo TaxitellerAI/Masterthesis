@@ -11,6 +11,9 @@ export interface MetricRow {
   max_drawdown: number;
   cvar_95: number;
   turnover: number;
+  /** Vol-control only: the two legs of the like-for-like turnover above. */
+  turnover_exposure?: number | null;
+  turnover_sleeve?: number | null;
   // Strategies can run on DIFFERENT calendars (risk parity drops a warm-up), so
   // each row carries its own sample size and effective window.
   observations?: number | null;

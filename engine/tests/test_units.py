@@ -455,6 +455,31 @@ def test_periodic_mix_daily_equals_buy_and_hold():
         assert float(stt.weights_turnover(w2).sum()) > 0.0
 
 
+def test_vol_control_turnover_is_like_for_like():
+    """Vol-control turnover must count BOTH legs, or the table lies about it.
+
+    Reporting only the exposure leg made VolControl_10 (16.23) look cheaper to run
+    than Buy-and-Hold (19.40) when it actually trades 29.03 — the exposure figure is
+    a strict subset of that strategy's trading. Costs were always charged on both
+    legs, so this pins the REPORTED decomposition, not the returns.
+    """
+    from api.main import RunRequest, _prepared
+    from volcontrol import run_strategies
+    req = RunRequest(scenario="S1")
+    rets, cfg, _rf, _spec, _rep, pit = _prepared(req)
+    run = run_strategies(rets, cfg, req.crypto_share, pit_builder=pit)
+    bh = run["strategies"]["BuyHold"]["turnover"]
+    for k in ("VolControl_5", "VolControl_10", "VolControl_15"):
+        d = run["strategies"][k]
+        assert d["turnover_exposure"] > 0 and d["turnover_sleeve"] > 0, k
+        assert abs(d["turnover"] - (d["turnover_exposure"] + d["turnover_sleeve"])) < 1e-9, k
+        # The sleeve leg is the base portfolio's own turnover scaled by exposure,
+        # so it can never exceed the Buy-and-Hold column it is taken from.
+        assert d["turnover_sleeve"] <= bh + 1e-9, k
+    # The whole point: on a like-for-like basis vol control trades MORE, not less.
+    assert run["strategies"]["VolControl_10"]["turnover"] > bh
+
+
 def test_grid_matches_metrics_table():
     """Parameter-stability grid and metrics table must agree for the same config."""
     from volcontrol.config import EngineConfig
