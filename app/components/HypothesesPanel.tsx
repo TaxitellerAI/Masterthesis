@@ -9,6 +9,8 @@ interface Props {
   loading: boolean;
   /** Parameters moved since these results were computed. */
   stale?: boolean;
+  /** Why the last inference attempt failed (null = no failure). */
+  error?: string | null;
   onRun?: () => void;
 }
 
@@ -28,7 +30,9 @@ function Tag({ p }: { p: number }) {
   );
 }
 
-export default function HypothesesPanel({ data, loading, stale = false, onRun }: Props) {
+export default function HypothesesPanel({
+  data, loading, stale = false, error = null, onRun,
+}: Props) {
   return (
     <section>
       <div className="flex items-baseline justify-between mb-3">
@@ -41,7 +45,26 @@ export default function HypothesesPanel({ data, loading, stale = false, onRun }:
       {/* The data-level bootstrap costs ~7 s, so it is NOT tied to slider drags.
           When the parameters move away from the computed results, say so and offer
           an explicit recompute rather than showing figures for another setting. */}
-      {(stale || (!data && !loading)) && (
+      {/* A FAILED attempt must say so — the panel used to keep claiming it was
+          still computing while the request had long since died. */}
+      {error && !loading && (
+        <div className="mb-3 border px-4 py-3 flex items-start justify-between gap-4 text-xs"
+             style={{ borderColor: "var(--color-neg)" }}>
+          <span style={{ color: "var(--color-neg)" }}>
+            <strong>Inferenz fehlgeschlagen.</strong> {error}
+          </span>
+          {onRun && (
+            <button
+              onClick={onRun}
+              className="px-3 py-1 border border-ink bg-ink text-paper hover:bg-transparent hover:text-ink transition-colors whitespace-nowrap"
+            >
+              Erneut versuchen
+            </button>
+          )}
+        </div>
+      )}
+
+      {(stale || (!data && !loading && !error)) && (
         <div className="mb-3 border px-4 py-2.5 flex items-center justify-between gap-4 text-xs"
              style={{ borderColor: stale ? "var(--color-neg)" : "var(--color-hairline)" }}>
           <span style={{ color: stale ? "var(--color-neg)" : "var(--color-muted)" }}>

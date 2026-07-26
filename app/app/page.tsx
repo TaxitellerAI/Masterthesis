@@ -107,11 +107,13 @@ export default function Page() {
   // Parameters the CURRENT hypothesis results were computed for; if they drift away
   // from `params`, the panel says so instead of showing figures for another setting.
   const [hypParams, setHypParams] = useState<EngineParams | null>(null);
+  const [hypError, setHypError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
   const [downloadingDataset, setDownloadingDataset] = useState(false);
 
   const reqId = useRef(0);
+  const infId = useRef(0);   // separate counter for the expensive inference
 
   useEffect(() => {
     // A ?cfg=… permalink restores the full configuration (citable results).
@@ -190,19 +192,33 @@ export default function Page() {
     [scenarios],
   );
 
-  /** Inference is EXPENSIVE (data-level sweep bootstrap, B = 1000 ≈ 7 s cold), so it
-   *  never rides along with a slider drag — it runs on the initial run and on an
-   *  explicit request. Everything else stays live. */
-  const runInference = useCallback((p: EngineParams, id: number) => {
+  /** Inference is EXPENSIVE, so it never rides along with a slider drag — it runs on
+   *  the initial run and on an explicit request.
+   *
+   *  It owns its OWN request counter. It used to share `reqId` with the fast panels,
+   *  whose effect increments that counter on every parameter change — including the
+   *  one that fires the moment the results view mounts. The `finally` guard then
+   *  compared against an already-advanced counter, never cleared the loading flag,
+   *  and the panel said "Hypothesentests laufen…" forever. That was the real
+   *  "lädt ewig", independent of any server timing. */
+  const runInference = useCallback((p: EngineParams) => {
+    const id = ++infId.current;
     setLoadingHyp(true);
+    setHypError(null);
     fetchHypotheses(p)
       .then((h) => {
-        if (id !== reqId.current) return;
+        if (id !== infId.current) return;   // superseded by a NEWER inference request
         setHypotheses(h);
-        setHypParams(p);          // remember WHICH parameters these results belong to
+        setHypParams(p);                    // which parameters these results belong to
       })
-      .catch((e) => id === reqId.current && setError((e as Error).message))
-      .finally(() => id === reqId.current && setLoadingHyp(false));
+      .catch((e) => {
+        if (id !== infId.current) return;
+        setHypError((e as Error).message);  // shown IN the panel, with a retry
+      })
+      .finally(() => {
+        // Only a newer inference request may suppress this — never the fast panels.
+        if (id === infId.current) setLoadingHyp(false);
+      });
   }, []);
 
   // Fetch the slower analyses (robustness grid + analytics). NOT the bootstrap.
@@ -244,7 +260,7 @@ export default function Page() {
       setAnalytics(null);
       setStep("results");
       fetchSlow(params, id);
-      runInference(params, id);        // once, for the initial configuration
+      runInference(params);            // once, for the initial configuration
     } catch (e) {
       if (id === reqId.current) setError((e as Error).message);
     } finally {
@@ -390,10 +406,11 @@ export default function Page() {
       timeseries={timeseries}
       robustness={robustness}
       analytics={analytics}
+      hypError={hypError}
       hypStale={
         hypotheses !== null && hypParams !== null && !sameInferenceInputs(params, hypParams)
       }
-      onRunInference={() => runInference(params, ++reqId.current)}
+      onRunInference={() => runInference(params)}
       loadingFast={loadingFast}
       loadingHyp={loadingHyp}
       loadingSlow={loadingSlow}

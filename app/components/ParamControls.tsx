@@ -75,13 +75,20 @@ export default function ParamControls({ params, onChange, rf = null }: Props) {
         <div className="inline-flex border border-hairline-strong">
           {(["EUR", "USD"] as const).map((c) => {
             const active = params.base_currency === c;
+            // The frozen snapshot exists only in EUR. Offering USD there would
+            // produce EUR figures under a USD label — disable it and say why.
+            const blocked = c === "USD" && params.source === "frozen";
             return (
               <button
                 key={c}
-                onClick={() => onChange({ base_currency: c })}
+                disabled={blocked}
+                title={blocked
+                  ? "Der eingefrorene Datensatz liegt nur in EUR vor. Für USD die Live-Datenquelle wählen."
+                  : undefined}
+                onClick={() => !blocked && onChange({ base_currency: c })}
                 className={`px-5 py-1.5 text-sm nums transition-colors ${
                   active ? "bg-ink text-paper" : "bg-transparent text-muted hover:text-ink"
-                } ${c === "USD" ? "border-l border-hairline-strong" : ""}`}
+                } ${c === "USD" ? "border-l border-hairline-strong" : ""} ${blocked ? "opacity-40 cursor-not-allowed" : ""}`}
                 aria-pressed={active}
               >
                 {c}
@@ -91,8 +98,12 @@ export default function ParamControls({ params, onChange, rf = null }: Props) {
         </div>
         <p className="text-faint text-xs mt-2 leading-snug">
           EUR ist die Basiswährung der Thesis; der risikofreie Zins ist die realisierte
-          €STR/EONIA-Tagesreihe (siehe unten), nicht der 3M-EURIBOR. Kurse werden über
+          €STR/EONIA-Tagesreihe (siehe unten), nicht der 3M-EURIBOR. Live-Kurse werden über
           EURUSD nach EUR umgerechnet.
+          {params.source === "frozen" && (
+            <> Der <strong>eingefrorene</strong> Datensatz liegt ausschließlich in EUR vor —
+            USD ist hier deaktiviert, weil sonst EUR-Zahlen unter USD-Etikett erschienen.</>
+          )}
         </p>
       </div>
 

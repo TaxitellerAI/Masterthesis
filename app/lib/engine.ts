@@ -21,7 +21,7 @@ export class EngineError extends Error {
 
 /** POST a parameter set to one of the engine's compute endpoints. */
 export async function callEngine<T>(
-  endpoint: "backtest" | "sweep" | "hypotheses" | "describe" | "timeseries" | "robustness" | "analytics",
+  endpoint: "backtest" | "sweep" | "hypotheses" | "describe" | "timeseries" | "robustness" | "analytics" | "sweepbootstrap",
   params: EngineParams,
 ): Promise<T> {
   let res: Response;

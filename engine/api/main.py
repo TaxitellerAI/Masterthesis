@@ -42,6 +42,7 @@ FROZEN_PATH = "data/frozen_prices_eur.csv"    # frozen real-market snapshot (EUR
 FROZEN_RF_PATH = "data/frozen_rf_eur.csv"     # frozen chained €STR/EONIA series
 LIVE_TTL_SECONDS = 900         # reuse a live pull for 15 min (data is daily)
 SWEEP_BOOT_N = 1000           # data-level H3/TF4 replicates; ~7 s. Do NOT reduce.
+API_BOOTSTRAP_N = 1200        # paired-bootstrap replicates served by the API
 
 
 class RunRequest(BaseModel):
@@ -113,8 +114,26 @@ def _frozen_rf() -> tuple:
     return ser, meta
 
 
+def _check_currency(req: RunRequest) -> None:
+    """The frozen snapshot is EUR-only — refuse to label it anything else.
+
+    Selecting USD against the frozen source used to change nothing in the data while
+    the response still reported "USD". Three reports in this project have already
+    said something other than what they were; a silently wrong label is not an
+    option, so the combination is rejected with a reason instead.
+    """
+    if req.source == "frozen" and req.base_currency.upper() != "EUR":
+        raise HTTPException(
+            status_code=400,
+            detail=("Der eingefrorene Datensatz liegt ausschließlich in EUR vor — eine "
+                    "USD-Auswertung würde dieselben EUR-Kurse mit falschem Etikett "
+                    "ausweisen. Für USD bitte die Live-Datenquelle wählen."),
+        )
+
+
 def _prices_raw(req: RunRequest) -> pd.DataFrame:
     """Native (un-aligned) price matrix for the selected assets and source."""
+    _check_currency(req)
     try:
         if req.source == "live":
             prices = _live_prices(req.start, req.end, req.base_currency)
@@ -150,6 +169,7 @@ def _sample_for(req: RunRequest):
     spec = _spec_for(req)
     if spec is None:
         return None, None, None
+    _check_currency(req)
     try:
         prices = _frozen_prices() if req.source != "live" else _live_prices(
             spec.start, spec.end, req.base_currency)
@@ -351,6 +371,40 @@ def sweep(req: RunRequest):
 
 _sweepboot_cache: dict[tuple, dict] = {}
 _CACHE_MAX = 24
+PRECOMPUTED_PATH = "data/precomputed_inference.json"
+
+
+def _freeze(v):
+    """Make a JSON-decoded key hashable again (nested lists -> tuples).
+
+    The stored key round-trips through JSON, which turns the nested weight tuples
+    into lists; comparing without normalising would silently never match and every
+    request would fall back to the (impossible) live computation.
+    """
+    if isinstance(v, (list, tuple)):
+        return tuple(_freeze(x) for x in v)
+    return v
+
+
+@lru_cache(maxsize=1)
+def _precomputed() -> dict:
+    """Inference results shipped with the repo, keyed by the SAME analysis key the
+    live path builds.
+
+    Measured reality: /hypotheses needs 192 s on the deployed free tier while the
+    Next.js route may wait 60 s — the live call can never complete there. The main
+    specifications are therefore computed once (scripts/precompute_inference.py) and
+    served instantly. Because the stored key includes the data hash and every
+    result-relevant setting, ANY deviation falls through to the live computation;
+    a stale or mismatched result cannot be served.
+    """
+    import json
+    try:
+        with open(PRECOMPUTED_PATH) as f:
+            payload = json.load(f)
+    except Exception:
+        return {}
+    return {_freeze(e["key"]): e["result"] for e in payload.get("entries", [])}
 
 
 def _analysis_key(req: RunRequest, rets: pd.DataFrame, cfg: EngineConfig) -> tuple:
@@ -370,9 +424,12 @@ def _analysis_key(req: RunRequest, rets: pd.DataFrame, cfg: EngineConfig) -> tup
         req.vol_method, req.rebalance, round(float(req.dead_band), 10),
         cfg.weight_rebalance, cfg.lookback, cfg.trading_days, cfg.max_leverage,
         cfg.ewma_halflife, cfg.cost_traditional_bps, cfg.cost_crypto_bps,
-        cfg.cvar_alpha, cfg.expected_block, cfg.seed,
+        cfg.cvar_alpha, cfg.expected_block, cfg.seed, cfg.bootstrap_n,
         cfg.sweep_max_share, cfg.sweep_step,
-        tuple(sorted((req.trad_weights or {}).items())),
+        # EFFECTIVE weights from the config, not the request shape: passing the base
+        # case explicitly and omitting it are the SAME computation and must share a
+        # key, otherwise a precomputed result could never be found.
+        tuple(cfg.traditional_weights),
         sm_sweepboot.CRITERION_PRIMARY, SWEEP_BOOT_N,
     )
 
@@ -404,15 +461,28 @@ def sweepbootstrap(req: RunRequest):
     return _sweep_boot_cached(req, rets, cfg, sample_report)
 
 
+def _precomputed_for(req: RunRequest, rets, cfg):
+    """Shipped result for this EXACT configuration, or None."""
+    return _precomputed().get(_freeze(_analysis_key(req, rets, cfg)))
+
+
 @app.post("/hypotheses")
 def hypotheses(req: RunRequest):
-    rets, cfg, _, spec, sample_report, pit = _prepared(req, bootstrap_n=1200)   # smaller default for API latency (free-tier CPU)
+    rets, cfg, _, spec, sample_report, pit = _prepared(req, bootstrap_n=API_BOOTSTRAP_N)
+
+    # Shipped result for this EXACT configuration? Then serve it — the live path
+    # cannot finish inside the route budget on the deployed host (192 s measured
+    # against a 60 s limit). Any deviation misses the key and computes live.
+    pre = _precomputed_for(req, rets, cfg)
+    if pre is not None:
+        return {**pre, "precomputed": True}
+
     sboot = _sweep_boot_cached(req, rets, cfg, sample_report)
     res = hypothesis_tests(rets, cfg, req.crypto_share, req.target_vol,
                            pit_builder=pit, sweep_boot=sboot)
     res = {k: (v if k != "sweep" else v.round(5).to_dict(orient="records"))
            for k, v in res.items()}
-    return res
+    return {**res, "precomputed": False}
 
 
 @app.post("/timeseries")

@@ -40,6 +40,7 @@ interface Props {
   robustness: RobustnessResponse | null;
   analytics: AnalyticsResponse | null;
   hypStale?: boolean;
+  hypError?: string | null;
   onRunInference?: () => void;
   loadingFast: boolean;
   loadingHyp: boolean;
@@ -69,6 +70,7 @@ export default function ResultsView({
   robustness,
   analytics,
   hypStale = false,
+  hypError = null,
   onRunInference,
   loadingFast,
   loadingHyp,
@@ -182,6 +184,7 @@ export default function ResultsView({
               data={hypotheses}
               loading={loadingHyp}
               stale={hypStale}
+              error={hypError}
               onRun={onRunInference}
             />
             <InfoNotes

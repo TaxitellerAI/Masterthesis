@@ -518,6 +518,66 @@ def test_cache_key_separates_every_relevant_setting():
     assert _analysis_key(again, ra, ca) == k0
 
 
+def test_precomputed_matches_live_exactly():
+    """Shipped inference must equal what the live path computes — bit for bit.
+
+    A precomputed answer that drifts from the live one would be the worst possible
+    failure: the defence would cite numbers the tool no longer reproduces.
+    """
+    import json as _json
+    import sys as _sys, os as _os
+    _sys.path.insert(0, _os.path.join(_os.path.dirname(__file__), ".."))
+    from api.main import (RunRequest, _prepared, _analysis_key, _freeze,
+                          SWEEP_BOOT_N, API_BOOTSTRAP_N, PRECOMPUTED_PATH)
+    from volcontrol.backtest import hypothesis_tests
+    from volcontrol import sweepboot as sbm
+
+    with open(_os.path.join(_os.path.dirname(__file__), "..", PRECOMPUTED_PATH)) as f:
+        payload = _json.load(f)
+    entry = next(e for e in payload["entries"] if e["scenario"] == "S1")
+
+    req = RunRequest(scenario="S1", crypto_share=entry["crypto_share"],
+                     target_vol=entry["target_vol"])
+    rets, cfg, _i, _s, report, pit = _prepared(req, bootstrap_n=API_BOOTSTRAP_N)
+
+    # the stored key must still describe THIS configuration
+    assert _freeze(entry["key"]) == _freeze(_analysis_key(req, rets, cfg))
+
+    sboot = sbm.sweep_bootstrap(rets, cfg, req.target_vol, n_boot=SWEEP_BOOT_N,
+                                seed=cfg.seed)
+    live = hypothesis_tests(rets, cfg, req.crypto_share, req.target_vol,
+                            pit_builder=pit, sweep_boot=sboot)
+    pre = entry["result"]
+    for k in ("H1_max_drawdown", "H2_sharpe", "wilcoxon_daily",
+              "deflated_sharpe", "probabilistic_sharpe", "holm_adjusted"):
+        for kk, vv in live[k].items():
+            got = pre[k][kk]
+            if isinstance(vv, float):
+                assert abs(got - vv) < 1e-9, f"{k}.{kk}: {got} vs {vv}"
+            else:
+                assert got == vv, f"{k}.{kk}"
+    for metric in ("d_mdd", "d_cvar"):
+        for kk, vv in live["sweep_bootstrap"]["slopes"][metric].items():
+            assert abs(pre["sweep_bootstrap"]["slopes"][metric][kk] - vv) < 1e-9
+
+
+def test_precomputed_not_served_for_other_config():
+    """A different setting must MISS the shipped result and fall through to live."""
+    import sys as _sys, os as _os
+    _sys.path.insert(0, _os.path.join(_os.path.dirname(__file__), ".."))
+    from api.main import RunRequest, _prepared, _precomputed_for, API_BOOTSTRAP_N
+    base = RunRequest(scenario="S1", crypto_share=0.10, target_vol=0.10)
+    r0, c0, *_ = _prepared(base, bootstrap_n=API_BOOTSTRAP_N)
+    assert _precomputed_for(base, r0, c0) is not None      # the shipped one hits
+
+    for mod in ({"target_vol": 0.15}, {"rf_mode": "constant"},
+                {"vol_method": "ewma"}, {"dead_band": 0.05},
+                {"trad_weights": {"MSCI_World": 0.5, "Global_Bonds": 0.3, "Gold": 0.2}}):
+        req = RunRequest(**{**base.model_dump(), **mod})
+        rr, cc, *_ = _prepared(req, bootstrap_n=API_BOOTSTRAP_N)
+        assert _precomputed_for(req, rr, cc) is None, f"{mod} bekam ein fremdes Ergebnis"
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

@@ -52,15 +52,27 @@ export async function ensureEngineAwake(
 // wake probe, a gateway hiccup can surface a 502/503/504. We retry a few times
 // on gateway/timeout/network errors before giving up, so a cold engine self-heals
 // instead of surfacing an error to the user.
-async function postJson<T>(path: string, body: unknown, retries = 4): Promise<T> {
+async function postJson<T>(path: string, body: unknown, retries = 4,
+                           timeoutMs = 75_000): Promise<T> {
   let lastErr = "";
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const res = await fetch(path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      // Without a client deadline a hung request waits forever and the UI keeps
+      // claiming it is still computing. 75 s sits just past the route's own 60 s
+      // budget, so a real gateway timeout still surfaces as a 504 first.
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+      let res: Response;
+      try {
+        res = await fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: ctrl.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
       if (res.ok) return (await res.json()) as T;
       // 502/503/504 → engine waking or gateway timeout → worth retrying
       if ([502, 503, 504].includes(res.status) && attempt < retries) {
@@ -71,7 +83,10 @@ async function postJson<T>(path: string, body: unknown, retries = 4): Promise<T>
       const data = await res.json().catch(() => ({}) as { error?: string });
       throw new Error(data.error ?? `Anfrage fehlgeschlagen (${res.status}).`);
     } catch (e) {
-      lastErr = (e as Error).message;
+      const err = e as Error;
+      lastErr = err.name === "AbortError"
+        ? `Zeitlimit überschritten (${Math.round(timeoutMs / 1000)} s) — die Berechnung ist auf dem Server länger gelaufen, als die Route warten darf.`
+        : err.message;
       // network error (fetch reject) → also retry
       if (attempt < retries && !/fehlgeschlagen \(4/.test(lastErr)) {
         await sleep(4000 + attempt * 3000);
@@ -89,8 +104,11 @@ export const fetchBacktest = (p: EngineParams) =>
 export const fetchSweep = (p: EngineParams) =>
   postJson<SweepResponse>("/api/sweep", p);
 
+// Inference is the one call that can legitimately exceed the route budget. Retrying
+// it four times would mean ~5 minutes of "loading" before the user learns anything —
+// so it gets ONE attempt and reports honestly instead.
 export const fetchHypotheses = (p: EngineParams) =>
-  postJson<HypothesesResponse>("/api/hypotheses", p);
+  postJson<HypothesesResponse>("/api/hypotheses", p, 0, 75_000);
 
 export const fetchDescribe = (p: EngineParams) =>
   postJson<DescribeResponse>("/api/describe", p);
