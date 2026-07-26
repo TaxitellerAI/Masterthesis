@@ -219,6 +219,29 @@ export default function HypothesesPanel({
                       {pval(r.boot2.p_value)} · {(r.boot2.share_positive * 100).toFixed(0)} % der
                       Replikate positiv
                     </span>
+                    {/* The resampled path has no calendar, so two conventions inside this
+                        estimator necessarily differ from the main backtest. Naming them here
+                        is the only place a reader can see it — an unlabelled slope would be
+                        read as resting on the primary specification. */}
+                    <div className="mt-1.5 text-faint" style={{ fontSize: "0.7rem", lineHeight: 1.45 }}>
+                      <strong>Konventionen dieses Schätzers</strong> (abweichend vom Haupt-Backtest,
+                      weil ein resampelter Pfad keinen Kalender trägt): risikofreier Zins als{" "}
+                      <em>konstanter Skalar</em>
+                      {data.sweep_bootstrap?.rf_scalar_annual != null && (
+                        <> ({(data.sweep_bootstrap.rf_scalar_annual * 100).toFixed(2)} % p.a. —
+                        die mittlere TAGESabgrenzung der €STR/EONIA-Reihe, hochskaliert mit
+                        252 Handelstagen. Sie liegt leicht über dem mittleren notierten
+                        Jahressatz im Reproduzierbarkeitsblock, weil act/360 über 365
+                        Kalendertage abgrenzt, die Stichprobe aber nur 252 Zeilen je Jahr
+                        enthält)</>
+                      )}{" "}
+                      statt act/360-Tagesabgrenzung; Basisportfolio <em>täglich</em> auf die
+                      Zielgewichte zurückgesetzt statt monatlich, und <em>brutto</em> (ohne
+                      Gewichtsumschichtungskosten). Die Punktschätzung und alle Replikate
+                      verwenden denselben Schätzer; der Wert ist deshalb in sich konsistent,
+                      aber nicht deckungsgleich mit der Steigung des primären, monatlich
+                      rebalancierten Netto-Backtests.
+                    </div>
                   </div>
                 )}
                 <div className="mt-2 text-xs text-faint">

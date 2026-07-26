@@ -34,6 +34,14 @@ function migrate(o: Record<string, unknown>): Partial<EngineParams> {
   if (out.source === "synthetic") out.source = "frozen";
   if (out.rf_mode === "manual") out.rf_mode = "constant";
   if (out.rf_mode === "estr") out.rf_mode = "estr_chained";
+  // Same defect class as the /dataset export: a link minted before sample designs
+  // existed carries a basket but no `scenario`, so it merged onto the default
+  // `scenario: "S1"` — and the scenario effect then OVERWROTE the link's own
+  // assets and window with S1's. The cited link silently opened a different sample
+  // than it encoded. A link that names its own basket is by definition custom.
+  if (!out.scenario && Array.isArray(out.assets) && out.assets.length > 0) {
+    out.scenario = "custom";
+  }
   return out as Partial<EngineParams>;
 }
 

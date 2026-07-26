@@ -427,7 +427,7 @@ export async function POST(req: NextRequest) {
   // cannot be defended. Both are environment-stable.
   const fpTxt = fp
     ? `Datensatz-Hash ${fp.dataset_hash ?? "—"} · Lauf-Hash ${fp.run_hash ?? fp.hash} · ` +
-      `Fenster ${fp.start}–${fp.end} · `
+      `Renditefenster ${fp.start}–${fp.end} · `
     : "";
   draw(
     `${fpTxt}Kein Anlageratschlag. Alle Kennzahlen werden ausschließlich von der Python-Engine berechnet.`,

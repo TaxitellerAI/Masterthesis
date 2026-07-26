@@ -260,6 +260,9 @@ export interface SweepBootstrap {
   shares: number[];
   observations: number;
   runtime_seconds?: number;
+  /** Flat annual rf this estimator uses instead of the act/360 daily accrual —
+      a resampled path has no calendar, so the daily series cannot be carried. */
+  rf_scalar_annual?: number;
   simplifications: Record<string, unknown>;
   bands: Record<
     string,

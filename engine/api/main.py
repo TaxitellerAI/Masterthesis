@@ -286,7 +286,11 @@ def artefact():
         with open(PRECOMPUTED_PATH) as f:
             payload = json.load(f)
     except Exception as e:
-        return {"ok": False, "reason": f"Artefakt nicht ladbar: {e}", "entries": []}
+        return {"ok": False, "load_error": str(e),
+                "reason": f"Artefakt nicht ladbar: {e} — es wird live gerechnet, was im "
+                          f"Deployment in den Gateway-Timeout laeuft. Neu erzeugen: "
+                          f"python scripts/precompute_inference.py",
+                "entries": []}
 
     rows = []
     for e in payload.get("entries", []):
@@ -299,8 +303,10 @@ def artefact():
             matches, cfg = False, None
         rows.append({"scenario": e["scenario"], "matches": bool(matches)})
     stale = [r["scenario"] for r in rows if not r["matches"]]
+    load_err = _ARTEFACT_ERROR.get("reason")
     return {
-        "ok": not stale,
+        "ok": (not stale) and load_err is None,
+        "load_error": load_err,
         "generated_at": payload.get("generated_at"),
         "entries": rows,
         "stale": stale,
@@ -420,6 +426,8 @@ def sweep(req: RunRequest):
 _sweepboot_cache: dict[tuple, dict] = {}
 _CACHE_MAX = 24
 PRECOMPUTED_PATH = "data/precomputed_inference.json"
+# Load failure is surfaced through /artefact instead of being swallowed.
+_ARTEFACT_ERROR: dict = {"reason": None}
 
 
 def _freeze(v):
@@ -447,11 +455,21 @@ def _precomputed() -> dict:
     a stale or mismatched result cannot be served.
     """
     import json
+    import logging
     try:
         with open(PRECOMPUTED_PATH) as f:
             payload = json.load(f)
-    except Exception:
+    except Exception as e:
+        # Swallowing this was dangerous: a missing or corrupt artefact silently fell
+        # back to the live computation, which cannot finish on the deployed host —
+        # the user saw a 504 with no discoverable cause. Make it loud instead.
+        logging.getLogger(__name__).error(
+            "Vorberechnetes Inferenz-Artefakt nicht ladbar (%s): %s — es wird live "
+            "gerechnet, was im Deployment in den Gateway-Timeout laeuft. "
+            "Neu erzeugen: python scripts/precompute_inference.py", PRECOMPUTED_PATH, e)
+        _ARTEFACT_ERROR["reason"] = f"{type(e).__name__}: {e}"
         return {}
+    _ARTEFACT_ERROR["reason"] = None
     return {_freeze(e["key"]): e["result"] for e in payload.get("entries", [])}
 
 
@@ -630,15 +648,40 @@ def robustness(req: RunRequest):
     }
 
 
-@app.post("/dataset")
-def dataset(req: RunRequest):
-    """Frozen dataset export: the exact aligned price matrix the run used, as CSV,
-    with the fingerprint hash in the filename — the citable data snapshot."""
+def _scenario_prices(req: RunRequest, spec) -> pd.DataFrame:
+    """Price matrix of the ACTIVE sample — the rows the run really used.
+
+    Both exports (/dataset, /workbook) go into the thesis appendix and must show the
+    scenario's sample, never the full universe.
+    """
+    if spec is not None:
+        prices_all = _frozen_prices() if req.source != "live" else _live_prices(
+            spec.start, spec.end, req.base_currency)
+        kept, _rep = sm.resolve_sample(prices_all, spec)
+        return kept
     prices = _prices_raw(req)
     if req.source in ("live", "frozen"):
         prices = prices.dropna()
-    rets = _returns_for(req)
-    fp = fingerprint(rets, _run_spec(req))
+    return prices
+
+
+@app.post("/dataset")
+def dataset(req: RunRequest):
+    """The EXACT price matrix the active run used, as CSV — the citable snapshot.
+
+    This file goes into the thesis appendix and is supposed to back the reported
+    hash, so it must match the ACTIVE SCENARIO exactly. It previously ignored the
+    scenario and returned the full universe: asking for S1 produced 8 columns
+    including Solana and 1,440 rows instead of S1's 7 columns and 2,011 rows. An
+    appendix holding a different sample than the text is the most expensive kind of
+    mismatch in this project.
+    """
+    scoped, spec, sample_report = _sample_for(req)
+    prices = _scenario_prices(req, spec)
+    rets = scoped if scoped is not None else _returns_for(req)
+
+    # Same hash the report shows, so file name and report cannot disagree.
+    fp = fingerprint(rets, _spec_with_effective(req, sample_report))
     csv = prices.to_csv(index_label="date")
     return Response(
         content=csv,
@@ -667,9 +710,10 @@ def workbook(req: RunRequest):
     """Transparency workbook (.xlsx): raw prices + every value as a live Excel
     formula, so the examiner can reproduce each number by hand."""
     rets, cfg, rf_info, spec, sample_report, pit = _prepared(req)
-    prices = _prices_raw(req)
-    if req.source in ("live", "frozen"):
-        prices = prices.dropna()                 # aligned prices that rets came from
+    # Same scenario discipline as /dataset: the workbook is the third independent
+    # source for the reported figures, so its price sheet must be the ACTIVE sample —
+    # not the full universe.
+    prices = _scenario_prices(req, spec)
 
     run = run_strategies(rets, cfg, req.crypto_share, pit_builder=pit)
     key = f"VolControl_{int(req.target_vol * 100)}"
@@ -679,7 +723,7 @@ def workbook(req: RunRequest):
     vc_ret = run["strategies"][key]["returns"]
     weights = portfolio_weights(req.crypto_share, list(rets.columns), cfg)
 
-    stats = describe_assets(_prices_raw(req), cfg.rf_annual, cfg.cvar_alpha)
+    stats = describe_assets(prices, cfg.rf_annual, cfg.cvar_alpha)
     hyp_cfg = EngineConfig(**{**cfg.__dict__, "bootstrap_n": 1200})
     extras = {
         "describe": stats.round(6).to_dict(orient="records"),

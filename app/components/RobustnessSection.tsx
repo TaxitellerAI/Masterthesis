@@ -47,6 +47,18 @@ export default function RobustnessSection({ data, loading, selectedTargetVol }: 
                   {pct(data.walk_forward.oos_metrics.max_drawdown ?? NaN)} vs. BH{" "}
                   {pct(data.walk_forward.bh_oos_metrics.max_drawdown ?? NaN)}.
                 </p>
+                {/* The IS/OOS columns below sit next to each other and invite a
+                    difference to be read off them. That reading is not valid — the
+                    caption has to say so, or the thesis text will make the comparison. */}
+                <p className="text-faint text-xs mb-2">
+                  <strong>IS- und OOS-Sharpe sind nicht direkt vergleichbar.</strong> Der IS-Wert ist
+                  das <em>Maximum</em> über die im Fold geprüften Zielvolatilitäten und enthält damit
+                  den Selektionsvorteil; der OOS-Wert ist eine einzelne Realisierung der so gewählten
+                  Zielvol. Beide beziehen sich zudem auf verschieden lange Fenster. Die Differenz
+                  IS − OOS ist deshalb kein Maß für Overfitting, sondern nur ein Hinweis darauf, wie
+                  stark der Selektionsschritt in-sample schmeichelt. Aussagekräftig ist allein der
+                  OOS-Vergleich VC gegen BH auf demselben Fenster.
+                </p>
                 <TimeSeriesChart
                   dates={data.walk_forward.oos.dates}
                   series={[

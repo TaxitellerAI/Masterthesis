@@ -59,6 +59,11 @@ function buildNotes(negTxt: string | null): { title: string; body: string }[] { 
       "Das Datenfenster ist mit festen Kalendergrenzen definiert (01.01.2018 – 31.12.2025, acht volle Jahre), nicht als rollierendes 'letzte N Jahre' — sonst lieferte jeder Abruf einen anderen Datenstand und keine berichtete Zahl wäre zitierfähig. 2018 ist zugleich das erste Jahr mit vollständiger Historie aller Default-Kryptowerte. Kurse und Zinsreihe sind als Snapshot eingefroren. Ausgewiesen werden ZWEI Anker: der Datensatz-Hash bürgt für die Datenbasis allein, der Lauf-Hash zusätzlich für Fenstergrenzen, Datenquelle, Zinsmodus und Gewichte — zwei Läufe mit unterschiedlichen Annahmen können also nie denselben Lauf-Hash tragen. Beide sind auf 1e-12 quantisiert und damit plattformunabhängig reproduzierbar (der byte-exakte Digest unterscheidet sich zwischen macOS und Linux um ein letztes Bit und taugt deshalb nicht als zitierfähiger Wert).",
   },
   {
+    title: "Fehlende Werte im Kurspanel",
+    body:
+      "Das eingefrorene Panel beginnt am 07.07.2014, die Bitcoin-Historie der Quelle erst am 17.09.2014. Die 51 fehlenden Bitcoin-Werte liegen deshalb ausnahmslos VOR dem ersten verfügbaren Kurs; nach Handelsbeginn enthält die Reihe keine einzige Lücke. Dasselbe gilt für Ethereum, XRP und BNB (ab 09.11.2017) sowie Solana (ab 10.04.2020). Es handelt sich um Verfügbarkeit am Anfang der Reihe, nicht um Löcher in laufenden Daten — und der betroffene Bereich liegt vollständig außerhalb jedes berichteten Stichprobenfensters (S1 ab 2018, S2 ab 2015). Es wird nichts interpoliert oder aufgefüllt; das Complete-Case-Verfahren des Sample-Designs entfernt unvollständige Zeilen.",
+  },
+  {
     title: "Survivorship-Bias im Krypto-Universum",
     body:
       "BTC/ETH/XRP/BNB/SOL sind die heutigen großen Coins — die Auswahl ist rückschauend verzerrt. Sauber wäre ein zum Startzeitpunkt investierbares Universum. Die Verzerrung ist zu benennen und in der Interpretation zu berücksichtigen.",
@@ -67,6 +72,11 @@ function buildNotes(negTxt: string | null): { title: string; body: string }[] { 
     title: "Annualisierung (Kalender)",
     body:
       "Deskriptive Kennzahlen nutzen den nativen Kalender je Asset (Krypto ~365, Aktien ~252 Tage/Jahr; der tatsächliche Wert je Asset steht in der Spalte 'Tage/J'). Der Portfolio-Backtest samplet auf dem gemeinsamen Handelskalender — bewusste, konsistente Annahme für die tägliche Portfoliobildung. Die ausgewiesene Wölbung ist die EXZESS-Kurtosis (Normalverteilung = 0, nicht 3); positive Werte bedeuten fettere Ränder als die Normalverteilung.",
+  },
+  {
+    title: "Wochenendkompression bei Krypto",
+    body:
+      "Auf dem gemeinsamen Handelskalender fällt die Krypto-Bewegung von Freitag bis Montag in EINE Beobachtung. Diese Mehrtagesbeobachtungen sind erwartungsgemäß volatiler: im Hauptsample (S1) haben die 440 Beobachtungen mit Lücke > 1 Tag (mittlere Lücke 3,07 Tage) die 2,16-fache Varianz der 1.569 echten Tagesbeobachtungen — nahe dem Faktor 3, den reine Varianzadditivität erwarten ließe. Genau deshalb verzerrt die Kompression die ANNUALISIERTE Volatilität aber nicht: es werden weniger Beobachtungen mit im Mittel proportional größerer Varianz gezählt, und beim Hochskalieren mit der kleineren Beobachtungszahl (251 statt 365) hebt sich das nahezu auf. Gemessen an Bitcoin über S1: 65,16 % p.a. nativ gegen 64,92 % p.a. ausgerichtet; die Summe der Varianzen über das Fenster unterscheidet sich um −0,67 %. Betroffen ist die VERTEILUNGSFORM, nicht das Niveau: die Exzess-Kurtosis fällt von 7,88 (nativ) auf 6,63 (ausgerichtet). Dass die Kompression Fat Tails systematisch verstärke, lässt sich aus dieser einen Stichprobe NICHT ableiten — hier zeigt sie in die Gegenrichtung.",
   },
 ];
 }
@@ -167,7 +177,13 @@ export default function InfoNotes({
               </span>
             </span>
             <span>
-              Fenster <span className="text-ink">{fingerprint.start}</span> – <span className="text-ink">{fingerprint.end}</span>
+              {/* The sample header shows the first PRICE row, this shows the first
+                  RETURN day — they differ by one row and both were labelled "Fenster",
+                  which reads as a contradiction inside one view. */}
+              <span title="Erster und letzter RENDITETAG. Die Kopfzeile nennt die erste Kurszeile — sie liegt einen Handelstag früher, weil die erste Kurszeile keine Rendite erzeugt.">
+                Renditefenster
+              </span>{" "}
+              <span className="text-ink">{fingerprint.start}</span> – <span className="text-ink">{fingerprint.end}</span>
             </span>
           </>
         )}

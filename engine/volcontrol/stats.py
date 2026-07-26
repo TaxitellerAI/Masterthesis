@@ -68,9 +68,14 @@ def paired_bootstrap_diff(a, b, metric_fn, n_boot=10_000,
     """Paired bootstrap of metric(a) - metric(b) using shared resample indices.
 
     Returns the observed difference, a two-sided bootstrap p-value, the plain
-    percentile 95% CI, and a bias-corrected & accelerated (BCa) 95% CI. The BCa
-    acceleration uses a delete-a-group jackknife capped at ~150 groups, so the cost
-    stays O(groups · n) instead of O(n²) — accurate and fast enough for a small host.
+    percentile 95% CI, and a bias-corrected & accelerated (BCa) 95% CI.
+
+    The BCa acceleration uses the FULL delete-1 jackknife (Efron 1987). An earlier
+    version capped it at 150 delete-a-group blocks for speed; measured, that cap saved
+    0.1 s at n = 2010 while distorting the H1 (max-drawdown) interval badly: deleting a
+    contiguous 13-day block can remove an entire drawdown episode, which more than
+    doubled the acceleration term (â 0.140 vs 0.064) and inflated the upper bound by
+    17 %. Path-dependent statistics do not tolerate group deletion.
     """
     rng = np.random.default_rng(seed)
     a = np.asarray(a, float)
@@ -84,16 +89,13 @@ def paired_bootstrap_diff(a, b, metric_fn, n_boot=10_000,
     observed = metric_fn(a) - metric_fn(b)
     p_two_sided = 2.0 * min((diffs <= 0).mean(), (diffs >= 0).mean())
 
-    # delete-a-group jackknife for BCa acceleration (grouped when n is large)
-    n_groups = min(n, 150)
-    bounds = np.linspace(0, n, n_groups + 1).astype(int)
-    jack = np.empty(n_groups)
+    # Full delete-1 jackknife for the BCa acceleration (Efron 1987).
+    jack = np.empty(n)
     keep = np.ones(n, dtype=bool)
-    for g in range(n_groups):
-        lo, hi = bounds[g], bounds[g + 1]
-        keep[lo:hi] = False
-        jack[g] = metric_fn(a[keep]) - metric_fn(b[keep])
-        keep[lo:hi] = True
+    for i in range(n):
+        keep[i] = False
+        jack[i] = metric_fn(a[keep]) - metric_fn(b[keep])
+        keep[i] = True
     bca_lo, bca_hi = _bca_bounds(observed, diffs, jack)
 
     return {
