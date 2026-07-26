@@ -225,6 +225,29 @@ def fetch_rf_estr(start: str, end: str) -> dict:
     }
 
 
+def stable_data_hash(returns: pd.DataFrame, decimals: int = 12) -> str:
+    """Environment-STABLE content hash of a returns matrix.
+
+    `fingerprint` hashes the raw float64 bytes, which makes it exact but also
+    machine-dependent: the same data on macOS (Accelerate) and Linux (OpenBLAS)
+    differs by up to one ULP after the reduction chain, and one differing bit
+    changes the digest completely. Measured on this project: H1's observed
+    difference came out as ...587 on the deployed host and ...598 locally.
+
+    Rounding to `decimals` (1e-12) before hashing removes that last-bit noise while
+    remaining far more precise than any real data change could ever be — a changed
+    price moves returns by orders of magnitude more. This is what cache and
+    precompute keys must use so a locally built artefact still matches in
+    production. The reported/citable fingerprint stays byte-exact and unchanged.
+    """
+    import hashlib
+    import numpy as np
+    arr = np.ascontiguousarray(
+        np.round(returns.fillna(0.0).to_numpy(dtype="float64"), decimals))
+    arr = arr + 0.0                      # normalise -0.0 to 0.0
+    return hashlib.sha256(arr.tobytes()).hexdigest()[:16]
+
+
 def fingerprint(returns: pd.DataFrame, spec: dict | None = None) -> dict:
     """Deterministic content hash of a returns matrix — for reproducibility, so a
     report can be tied to the exact data that produced it.

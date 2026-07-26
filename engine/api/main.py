@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from volcontrol import (
     EngineConfig, load_prices, simple_returns, fetch_prices_yf, fingerprint,
-    load_rf_frozen, rf_daily_series, STUDY_START, STUDY_END,
+    load_rf_frozen, rf_daily_series, STUDY_START, STUDY_END, stable_data_hash,
     run_strategies, metrics_table, crypto_sweep, hypothesis_tests,
     describe_assets, correlation_matrix, sample_window, asset_calendar_returns,
     ticker_map, universe_payload,
@@ -273,6 +273,43 @@ def health():
     return {"status": "ok", "assets": list(r.columns), "observations": int(len(r))}
 
 
+@app.get("/artefact")
+def artefact():
+    """Health of the shipped inference artefact.
+
+    If the engine changed since the artefact was built, the stored keys stop matching
+    and every request silently falls back to the (in production impossible) live
+    computation. This surfaces that instead of letting it rot unnoticed.
+    """
+    import json
+    try:
+        with open(PRECOMPUTED_PATH) as f:
+            payload = json.load(f)
+    except Exception as e:
+        return {"ok": False, "reason": f"Artefakt nicht ladbar: {e}", "entries": []}
+
+    rows = []
+    for e in payload.get("entries", []):
+        req = RunRequest(scenario=e["scenario"], crypto_share=e["crypto_share"],
+                         target_vol=e["target_vol"])
+        try:
+            rets, cfg, *_ = _prepared(req, bootstrap_n=API_BOOTSTRAP_N)
+            matches = _freeze(e["key"]) == _freeze(_analysis_key(req, rets, cfg))
+        except Exception as ex:
+            matches, cfg = False, None
+        rows.append({"scenario": e["scenario"], "matches": bool(matches)})
+    stale = [r["scenario"] for r in rows if not r["matches"]]
+    return {
+        "ok": not stale,
+        "generated_at": payload.get("generated_at"),
+        "entries": rows,
+        "stale": stale,
+        "reason": (None if not stale else
+                   f"Artefakt veraltet für {', '.join(stale)} — Engine hat sich seit dem "
+                   f"Erzeugen geändert. Neu erzeugen: python scripts/precompute_inference.py"),
+    }
+
+
 @app.get("/scenarios")
 def scenarios():
     """Scenario catalogue for the configurator (single source of truth: sample.py)."""
@@ -417,7 +454,10 @@ def _analysis_key(req: RunRequest, rets: pd.DataFrame, cfg: EngineConfig) -> tup
     signature of sweep_bootstrap), so including it would only cause needless misses.
     """
     return (
-        fingerprint(rets)["hash"],
+        # Environment-STABLE hash: the byte-exact fingerprint differs by one ULP
+        # between macOS and the Linux host, so a locally built precompute artefact
+        # could never match in production. Verified: it never did.
+        stable_data_hash(rets),
         req.scenario, req.source, req.start, req.end, req.base_currency,
         round(float(req.target_vol), 10),
         _rf_mode(req), round(float(cfg.rf_annual), 12), cfg.rf_convention,
@@ -464,6 +504,79 @@ def sweepbootstrap(req: RunRequest):
 def _precomputed_for(req: RunRequest, rets, cfg):
     """Shipped result for this EXACT configuration, or None."""
     return _precomputed().get(_freeze(_analysis_key(req, rets, cfg)))
+
+
+# ── Asynchronous jobs ────────────────────────────────────────────────────────
+# Measured: a cold /hypotheses on the deployed free tier takes 192–234 s while the
+# calling route may wait 60 s. Worse, an aborted request leaves NOTHING cached
+# (verified: abort after 8 s -> next full call still 234 s -> only the call after
+# that hit the cache in 0,67 s), so every retry restarts from zero. No timeout
+# tuning fixes that; the request has to stop being synchronous.
+#
+# A job therefore runs in a background thread and each HTTP call returns in
+# milliseconds — no gateway limit is ever approached, and the result lands in the
+# same cache the synchronous path uses.
+_jobs: dict[str, dict] = {}
+_JOBS_MAX = 12
+
+
+def _job_key(req: RunRequest, rets, cfg) -> str:
+    import hashlib
+    return hashlib.sha256(repr(_analysis_key(req, rets, cfg)).encode()).hexdigest()[:16]
+
+
+@app.post("/jobs/hypotheses")
+def start_hypotheses_job(req: RunRequest):
+    """Start (or join) an inference job. Returns immediately with a job id."""
+    import threading
+    rets, cfg, _, spec, sample_report, pit = _prepared(req, bootstrap_n=API_BOOTSTRAP_N)
+
+    pre = _precomputed_for(req, rets, cfg)
+    if pre is not None:                     # nothing to schedule — ship it
+        return {"job_id": None, "status": "done", "result": {**pre, "precomputed": True}}
+
+    jid = _job_key(req, rets, cfg)
+    job = _jobs.get(jid)
+    if job and job["status"] in ("running", "done"):
+        return {"job_id": jid, "status": job["status"]}
+
+    if len(_jobs) >= _JOBS_MAX:
+        for k, v in list(_jobs.items()):
+            if v["status"] != "running":
+                _jobs.pop(k, None)
+
+    _jobs[jid] = {"status": "running", "started": time.time(), "result": None, "error": None}
+
+    def _work():
+        try:
+            sboot = _sweep_boot_cached(req, rets, cfg, sample_report)
+            res = hypothesis_tests(rets, cfg, req.crypto_share, req.target_vol,
+                                   pit_builder=pit, sweep_boot=sboot)
+            res = {k: (v if k != "sweep" else v.round(5).to_dict(orient="records"))
+                   for k, v in res.items()}
+            _jobs[jid].update(status="done", result={**res, "precomputed": False},
+                              seconds=round(time.time() - _jobs[jid]["started"], 1))
+        except Exception as e:                            # noqa: BLE001 - surfaced to the client
+            _jobs[jid].update(status="error", error=str(e))
+
+    threading.Thread(target=_work, daemon=True).start()
+    return {"job_id": jid, "status": "running"}
+
+
+@app.get("/jobs/{job_id}")
+def job_status(job_id: str):
+    """Poll a job. Returns the result once it is done."""
+    job = _jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Unbekannte Job-ID (Server neu gestartet?).")
+    out = {"job_id": job_id, "status": job["status"],
+           "elapsed": round(time.time() - job["started"], 1)}
+    if job["status"] == "done":
+        out["result"] = job["result"]
+        out["seconds"] = job.get("seconds")
+    elif job["status"] == "error":
+        out["error"] = job["error"]
+    return out
 
 
 @app.post("/hypotheses")

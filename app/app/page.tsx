@@ -108,6 +108,7 @@ export default function Page() {
   // from `params`, the panel says so instead of showing figures for another setting.
   const [hypParams, setHypParams] = useState<EngineParams | null>(null);
   const [hypError, setHypError] = useState<string | null>(null);
+  const [hypElapsed, setHypElapsed] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
   const [downloadingDataset, setDownloadingDataset] = useState(false);
@@ -205,7 +206,10 @@ export default function Page() {
     const id = ++infId.current;
     setLoadingHyp(true);
     setHypError(null);
-    fetchHypotheses(p)
+    setHypElapsed(0);
+    fetchHypotheses(p, (sec) => {
+      if (id === infId.current) setHypElapsed(sec);   // real progress, not a bare spinner
+    })
       .then((h) => {
         if (id !== infId.current) return;   // superseded by a NEWER inference request
         setHypotheses(h);
@@ -407,6 +411,7 @@ export default function Page() {
       robustness={robustness}
       analytics={analytics}
       hypError={hypError}
+      hypElapsed={hypElapsed}
       hypStale={
         hypotheses !== null && hypParams !== null && !sameInferenceInputs(params, hypParams)
       }

@@ -578,6 +578,27 @@ def test_precomputed_not_served_for_other_config():
         assert _precomputed_for(req, rr, cc) is None, f"{mod} bekam ein fremdes Ergebnis"
 
 
+def test_stable_hash_survives_one_ulp_but_catches_real_change():
+    """Cache/precompute keys must not break on last-bit noise across platforms.
+
+    Measured on this project: the byte-exact fingerprint of the SAME data differed
+    between macOS and the Linux host (H1 came out ...587 there vs ...598 here), so a
+    locally built precompute artefact could never match in production.
+    """
+    from volcontrol.data import stable_data_hash, fingerprint
+    r = _s1_returns()
+    h0 = stable_data_hash(r)
+
+    ulp = r.copy()
+    ulp.iloc[0, 0] = np.nextafter(ulp.iloc[0, 0], 1.0)     # one ULP up
+    assert stable_data_hash(ulp) == h0                      # stable key survives
+    assert fingerprint(ulp)["hash"] != fingerprint(r)["hash"]   # exact hash does not
+
+    real = r.copy()
+    real.iloc[0, 0] += 1e-9                                 # a REAL change
+    assert stable_data_hash(real) != h0
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

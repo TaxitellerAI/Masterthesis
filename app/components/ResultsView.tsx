@@ -41,6 +41,7 @@ interface Props {
   analytics: AnalyticsResponse | null;
   hypStale?: boolean;
   hypError?: string | null;
+  hypElapsed?: number;
   onRunInference?: () => void;
   loadingFast: boolean;
   loadingHyp: boolean;
@@ -71,6 +72,7 @@ export default function ResultsView({
   analytics,
   hypStale = false,
   hypError = null,
+  hypElapsed = 0,
   onRunInference,
   loadingFast,
   loadingHyp,
@@ -185,6 +187,7 @@ export default function ResultsView({
               loading={loadingHyp}
               stale={hypStale}
               error={hypError}
+              elapsed={hypElapsed}
               onRun={onRunInference}
             />
             <InfoNotes

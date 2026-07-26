@@ -11,6 +11,8 @@ interface Props {
   stale?: boolean;
   /** Why the last inference attempt failed (null = no failure). */
   error?: string | null;
+  /** Seconds the running job has been going (0 = not started/unknown). */
+  elapsed?: number;
   onRun?: () => void;
 }
 
@@ -31,7 +33,7 @@ function Tag({ p }: { p: number }) {
 }
 
 export default function HypothesesPanel({
-  data, loading, stale = false, error = null, onRun,
+  data, loading, stale = false, error = null, elapsed = 0, onRun,
 }: Props) {
   return (
     <section>
@@ -84,8 +86,25 @@ export default function HypothesesPanel({
         </div>
       )}
 
+      {/* Show the ELAPSED time of the running job. A bare spinner gave no way to
+          tell "computing" from "hung" — which is how the endless-loading bug went
+          unnoticed for so long. */}
       {!data && (
-        <SectionPlaceholder loading={loading} label="Hypothesentests laufen (Bootstrap, B = 1.000)…" height={220} />
+        <SectionPlaceholder
+          loading={loading}
+          label={
+            loading
+              ? `Hypothesentests laufen (Bootstrap, B = 1.000)${elapsed ? ` — ${elapsed} s` : "…"}`
+              : "Inferenz noch nicht berechnet."
+          }
+          height={220}
+        />
+      )}
+      {loading && data && (
+        <p className="text-faint text-xs mt-2">
+          Neue Inferenz läuft{elapsed ? ` (${elapsed} s)` : ""} — unten stehen noch die
+          vorherigen Werte.
+        </p>
       )}
 
       {data && (

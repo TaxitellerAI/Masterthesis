@@ -3,6 +3,7 @@ from .config import EngineConfig
 from .data import (
     load_prices, simple_returns, fetch_prices_yf, fetch_rf_estr, fingerprint,
     fetch_rf_chained, load_rf_frozen, rf_daily_series, STUDY_START, STUDY_END,
+    stable_data_hash,
 )
 from . import metrics, strategies, stats, descriptive, universe, analysis
 from .descriptive import describe_assets, correlation_matrix, sample_window, asset_calendar_returns
@@ -33,6 +34,7 @@ __all__ = [
     "STUDY_START",
     "STUDY_END",
     "fingerprint",
+    "stable_data_hash",
     "metrics",
     "strategies",
     "stats",

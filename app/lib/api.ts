@@ -104,11 +104,50 @@ export const fetchBacktest = (p: EngineParams) =>
 export const fetchSweep = (p: EngineParams) =>
   postJson<SweepResponse>("/api/sweep", p);
 
-// Inference is the one call that can legitimately exceed the route budget. Retrying
-// it four times would mean ~5 minutes of "loading" before the user learns anything —
-// so it gets ONE attempt and reports honestly instead.
-export const fetchHypotheses = (p: EngineParams) =>
-  postJson<HypothesesResponse>("/api/hypotheses", p, 0, 75_000);
+/** Inference via the ASYNCHRONOUS job route.
+ *
+ *  A synchronous call cannot work in the deployment: measured 192–234 s on the free
+ *  tier against a 60 s route budget, and an aborted request leaves nothing cached, so
+ *  every retry restarts from zero. Starting a job and polling keeps every single HTTP
+ *  request in the millisecond range, so no gateway limit is ever approached.
+ *
+ *  `onProgress` receives the elapsed seconds so the panel can show real progress
+ *  instead of an unqualified spinner.
+ */
+export async function fetchHypotheses(
+  p: EngineParams,
+  onProgress?: (elapsedSeconds: number) => void,
+  maxWaitMs = 420_000,
+): Promise<HypothesesResponse> {
+  const started = await postJson<{
+    job_id: string | null; status: string; result?: HypothesesResponse;
+  }>("/api/jobs/hypotheses", p, 2, 30_000);
+
+  if (started.status === "done" && started.result) return started.result;   // precomputed
+  if (!started.job_id) throw new Error("Engine lieferte keine Job-ID zurück.");
+
+  const t0 = Date.now();
+  while (Date.now() - t0 < maxWaitMs) {
+    await sleep(1500);
+    const res = await fetch(`/api/jobs/${started.job_id}`, { cache: "no-store" });
+    if (!res.ok) {
+      if (res.status === 404) {
+        throw new Error("Der Rechen-Job ist verloren gegangen (Server neu gestartet). Bitte erneut starten.");
+      }
+      continue;                                   // transient gateway hiccup -> keep polling
+    }
+    const s = (await res.json()) as {
+      status: string; result?: HypothesesResponse; error?: string; elapsed?: number;
+    };
+    if (s.status === "done" && s.result) return s.result;
+    if (s.status === "error") throw new Error(s.error ?? "Berechnung fehlgeschlagen.");
+    onProgress?.(s.elapsed ?? Math.round((Date.now() - t0) / 1000));
+  }
+  throw new Error(
+    `Die Berechnung läuft seit über ${Math.round(maxWaitMs / 60_000)} Minuten. ` +
+    "Sie läuft serverseitig weiter — ein erneuter Versuch trifft dann den Cache.",
+  );
+}
 
 export const fetchDescribe = (p: EngineParams) =>
   postJson<DescribeResponse>("/api/describe", p);

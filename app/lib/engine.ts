@@ -61,6 +61,21 @@ export async function engineScenarios(): Promise<Response> {
   return fetch(`${ENGINE_URL}/scenarios`, { cache: "no-store" });
 }
 
+/** Start an asynchronous inference job (returns immediately with a job id). */
+export async function engineStartJob(params: EngineParams): Promise<Response> {
+  return fetch(`${ENGINE_URL}/jobs/hypotheses`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+    cache: "no-store",
+  });
+}
+
+/** Poll an inference job. */
+export async function engineJobStatus(id: string): Promise<Response> {
+  return fetch(`${ENGINE_URL}/jobs/${encodeURIComponent(id)}`, { cache: "no-store" });
+}
+
 /** POST to an engine endpoint that returns a binary payload (e.g. the .xlsx). */
 export async function callEngineRaw(endpoint: "workbook" | "dataset", params: EngineParams): Promise<Response> {
   try {
