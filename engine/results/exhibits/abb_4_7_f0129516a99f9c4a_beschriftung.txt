@@ -1,0 +1,5 @@
+abb_4_7: Parameter-Stabilität über Lookback und Zielvolatilität
+
+Sharpe Ratio der Vol-Control über die Parameterfläche. Ein flaches Bild ohne Klippen spricht gegen eine Überanpassung an eine einzelne Parameterwahl.
+
+Szenario S1 · Lauf-Hash f0129516a99f9c4a · Quelle robustness.param_stability

@@ -1,0 +1,32 @@
+﻿bezeichner;typ;kapitel;platzierung;szenario;quelle;lauf_hash;dateien;titel
+abb_3_1;Abbildung;3;Hauptteil;S1;describe.correlation;f0129516a99f9c4a;abb_3_1_f0129516a99f9c4a.pdf, abb_3_1_f0129516a99f9c4a.svg, abb_3_1_f0129516a99f9c4a.png, abb_3_1_f0129516a99f9c4a_beschriftung.txt;Korrelationsmatrix der Tagesrenditen
+tab_3_1;Tabelle;3;Hauptteil;S1;describe.assets;f0129516a99f9c4a;tab_3_1_f0129516a99f9c4a.csv, tab_3_1_f0129516a99f9c4a.txt;Anlageuniversum und Datenverfügbarkeit
+tab_3_2;Tabelle;3;Hauptteil;alle;backtest.sample + hashes;f0129516a99f9c4a;tab_3_2_f0129516a99f9c4a.csv, tab_3_2_f0129516a99f9c4a.txt;Sample-Designs und Reproduktionsanker
+tab_3_3;Tabelle;3;Hauptteil;S1;describe.assets;f0129516a99f9c4a;tab_3_3_f0129516a99f9c4a.csv, tab_3_3_f0129516a99f9c4a.txt;Deskriptive Statistik der Einzelanlagen
+tab_3_4;Tabelle;3;Hauptteil;S1;describe.rf.estr;f0129516a99f9c4a;tab_3_4_f0129516a99f9c4a.csv, tab_3_4_f0129516a99f9c4a.txt;Verketteter risikofreier Zins (€STR / EONIA)
+abb_4_10;Abbildung;4;Anhang;S1;analytics.distribution;f0129516a99f9c4a;abb_4_10_f0129516a99f9c4a.pdf, abb_4_10_f0129516a99f9c4a.svg, abb_4_10_f0129516a99f9c4a.png, abb_4_10_f0129516a99f9c4a_beschriftung.txt;Verteilung der Tagesrenditen mit CVaR-Markierung
+abb_4_11;Abbildung;4;Anhang;S1;robustness.walk_forward.oos;f0129516a99f9c4a;abb_4_11_f0129516a99f9c4a.pdf, abb_4_11_f0129516a99f9c4a.svg, abb_4_11_f0129516a99f9c4a.png, abb_4_11_f0129516a99f9c4a_beschriftung.txt;Out-of-Sample-Vermögensverlauf aus dem Walk-Forward
+abb_4_12;Abbildung;4;Anhang;S1;analytics.monthly;f0129516a99f9c4a;abb_4_12_f0129516a99f9c4a.pdf, abb_4_12_f0129516a99f9c4a.svg, abb_4_12_f0129516a99f9c4a.png, abb_4_12_f0129516a99f9c4a_beschriftung.txt;Monatsrenditen im Zeitraster
+abb_4_3;Abbildung;4;Hauptteil;S1;sweep.points + sweep_bootstrap.bands;f0129516a99f9c4a;abb_4_3_f0129516a99f9c4a.pdf, abb_4_3_f0129516a99f9c4a.svg, abb_4_3_f0129516a99f9c4a.png, abb_4_3_f0129516a99f9c4a_beschriftung.txt;Risiko-Effekt über die Krypto-Quote mit Konfidenzbändern
+abb_4_4;Abbildung;4;Anhang;S1;sweep.points + sweep_bootstrap.bands;f0129516a99f9c4a;abb_4_4_f0129516a99f9c4a.pdf, abb_4_4_f0129516a99f9c4a.svg, abb_4_4_f0129516a99f9c4a.png, abb_4_4_f0129516a99f9c4a_beschriftung.txt;Sharpe-Verläufe über die Krypto-Quote (brutto)
+abb_4_5;Abbildung;4;Hauptteil;S1;sweep_bootstrap.argmax;f0129516a99f9c4a;abb_4_5_f0129516a99f9c4a.pdf, abb_4_5_f0129516a99f9c4a.svg, abb_4_5_f0129516a99f9c4a.png, abb_4_5_f0129516a99f9c4a_beschriftung.txt;Bootstrap-Verteilung der optimalen Krypto-Quote
+abb_4_7;Abbildung;4;Hauptteil;S1;robustness.param_stability;f0129516a99f9c4a;abb_4_7_f0129516a99f9c4a.pdf, abb_4_7_f0129516a99f9c4a.svg, abb_4_7_f0129516a99f9c4a.png, abb_4_7_f0129516a99f9c4a_beschriftung.txt;Parameter-Stabilität über Lookback und Zielvolatilität
+abb_4_8;Abbildung;4;Anhang;S1;robustness.cost_sensitivity;f0129516a99f9c4a;abb_4_8_f0129516a99f9c4a.pdf, abb_4_8_f0129516a99f9c4a.svg, abb_4_8_f0129516a99f9c4a.png, abb_4_8_f0129516a99f9c4a_beschriftung.txt;Sharpe Ratio in Abhängigkeit von den Transaktionskosten
+abb_4_9;Abbildung;4;Anhang;S1;analytics.rolling;f0129516a99f9c4a;abb_4_9_f0129516a99f9c4a.pdf, abb_4_9_f0129516a99f9c4a.svg, abb_4_9_f0129516a99f9c4a.png, abb_4_9_f0129516a99f9c4a_beschriftung.txt;Rollierende Sharpe Ratio im Zeitverlauf
+tab_4_1;Tabelle;4;Hauptteil;S1;backtest.metrics;f0129516a99f9c4a;tab_4_1_f0129516a99f9c4a.csv, tab_4_1_f0129516a99f9c4a.txt;Kennzahlen der Strategien (Hauptspezifikation)
+tab_4_10;Tabelle;4;Anhang;S1;robustness.walk_forward;f0129516a99f9c4a;tab_4_10_f0129516a99f9c4a.csv, tab_4_10_f0129516a99f9c4a.txt;Walk-Forward: Folds und Out-of-Sample-Ergebnis
+tab_4_11;Tabelle;4;Hauptteil;S1;robustness.subperiods;f0129516a99f9c4a;tab_4_11_f0129516a99f9c4a.csv, tab_4_11_f0129516a99f9c4a.txt;Ergebnisse nach Marktregime
+tab_4_12;Tabelle;4;Anhang;S1;analytics.drawdowns;f0129516a99f9c4a;tab_4_12_f0129516a99f9c4a.csv, tab_4_12_f0129516a99f9c4a.txt;Die 5 tiefsten Drawdown-Episoden
+tab_4_3;Tabelle;4;Anhang;S1;backtest.metrics (turnover*);f0129516a99f9c4a;tab_4_3_f0129516a99f9c4a.csv, tab_4_3_f0129516a99f9c4a.txt;Zerlegung des Turnovers
+tab_4_4;Tabelle;4;Hauptteil;S1;hypotheses.H1/H2 + holm_adjusted;f0129516a99f9c4a;tab_4_4_f0129516a99f9c4a.csv, tab_4_4_f0129516a99f9c4a.txt;Konfirmatorische Hypothesentests H1 und H2
+tab_4_5;Tabelle;4;Hauptteil;S1;hypotheses.sweep_bootstrap.slopes;f0129516a99f9c4a;tab_4_5_f0129516a99f9c4a.csv, tab_4_5_f0129516a99f9c4a.txt;H3: Steigung des Effekts über die Krypto-Quote (Datenebene)
+tab_4_6;Tabelle;4;Anhang;S1;hypotheses.deflated_sharpe / probabilistic_sharpe;f0129516a99f9c4a;tab_4_6_f0129516a99f9c4a.csv, tab_4_6_f0129516a99f9c4a.txt;Deflated und Probabilistic Sharpe Ratio
+tab_4_7;Tabelle;4;Hauptteil;S1/S2/S3;hypotheses (drei Records);f0129516a99f9c4a;tab_4_7_f0129516a99f9c4a.csv, tab_4_7_f0129516a99f9c4a.txt;Szenariovergleich der konfirmatorischen Befunde
+tab_4_8;Tabelle;4;Hauptteil;S4_2018..2022;hypotheses (fünf Records);f0129516a99f9c4a;tab_4_8_f0129516a99f9c4a.csv, tab_4_8_f0129516a99f9c4a.txt;Sensitivität gegenüber dem Startjahr
+tab_4_9;Tabelle;4;Anhang;S1 / S1_rf3;backtest.metrics + hypotheses.H1;f0129516a99f9c4a;tab_4_9_f0129516a99f9c4a.csv, tab_4_9_f0129516a99f9c4a.txt;Sensitivität gegenüber der Zinsannahme
+tab_a_1;Tabelle;Anhang;Anhang;alle;hashes + git + environment;f0129516a99f9c4a;tab_a_1_f0129516a99f9c4a.csv, tab_a_1_f0129516a99f9c4a.txt;Reproduktionsnachweis je Record
+tab_4_2;FEHLT;4;Hauptteil;—;—;—;—;Teilfrage 1: Buy-and-Hold bei Krypto-Quote 0/10/25/50 %, netto
+abb_3_2;FEHLT;3;Hauptteil;—;—;—;—;Verlauf der verketteten €STR/EONIA-Tagesreihe
+abb_4_1;FEHLT;4;Hauptteil;—;—;—;—;Vermögensverlauf VC 5/10/15 gegen Buy-and-Hold und True Buy-and-Hold
+abb_4_2;FEHLT;4;Anhang;—;—;—;—;Exposure-Pfad der Vol-Control 10 % mit Hebelgrenze
+abb_4_6;FEHLT;4;Anhang;—;—;—;—;Drawdown-Verläufe VC 10 % gegen Buy-and-Hold

@@ -1,0 +1,9 @@
+﻿# tab_4_6 — Deflated und Probabilistic Sharpe Ratio
+# Szenario S1 · Lauf-Hash f0129516a99f9c4a · Quelle hypotheses.deflated_sharpe / probabilistic_sharpe
+# Nach Bailey und López de Prado. N ist die Zahl der tatsächlich durchprobierten Konfigurationen, nicht die Zahl der berichteten Strategien.
+Größe;Wert
+Beobachteter Sharpe (täglich);0,067091
+Probabilistic Sharpe Ratio;0,998373
+Schwellen-Sharpe sr₀ (täglich);0,009891
+Deflated Sharpe Ratio;0,993942
+Berücksichtigte Konfigurationen N;45

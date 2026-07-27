@@ -1,0 +1,5 @@
+abb_4_3: Risiko-Effekt über die Krypto-Quote mit Konfidenzbändern
+
+Positiv bedeutet mildere Verlustkennzahl als Buy-and-Hold. Das simultane Band deckt die gesamte Kurve gleichzeitig ab (Faktor 2,64 statt 1,96) und enthält bei niedrigen Quoten die Null, das punktweise nicht — die Gesamtunsicherheit über die Kurve ist deutlich größer als je Einzelpunkt. Die Kurven rechnen BRUTTO, ohne Kosten der Gewichtsumschichtung.
+
+Szenario S1 · Lauf-Hash f0129516a99f9c4a · Quelle sweep.points + sweep_bootstrap.bands

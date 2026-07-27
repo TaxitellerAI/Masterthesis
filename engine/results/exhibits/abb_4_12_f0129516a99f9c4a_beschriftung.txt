@@ -1,0 +1,5 @@
+abb_4_12: Monatsrenditen im Zeitraster
+
+Jede Zelle ist eine Monatsrendite der Vol-Control 10 %. Rot = negativ.
+
+Szenario S1 · Lauf-Hash f0129516a99f9c4a · Quelle analytics.monthly

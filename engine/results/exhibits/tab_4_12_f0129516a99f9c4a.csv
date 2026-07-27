@@ -1,0 +1,14 @@
+﻿# tab_4_12 — Die 5 tiefsten Drawdown-Episoden
+# Szenario S1 · Lauf-Hash f0129516a99f9c4a · Quelle analytics.drawdowns
+# Episoden nach Tiefe sortiert. Zeigt, welche konkreten Marktphasen die Drawdown-Kennzahl treiben.
+Strategie;Beginn;Tiefpunkt;Ende;Tiefe;Dauer (Tage);erholt
+Buy-and-Hold;2020-02-18;2020-03-16;2020-11-13;-27,14 %;269;ja
+Buy-and-Hold;2021-11-18;2022-06-17;2023-12-07;-17,93 %;749;ja
+Buy-and-Hold;2025-02-14;2025-04-08;2025-09-22;-16,17 %;220;ja
+Buy-and-Hold;2018-01-16;2018-12-21;2019-04-02;-15,79 %;441;ja
+Buy-and-Hold;2021-02-22;2021-02-26;2021-04-05;-9,70 %;42;ja
+Vol-Control 10 %;2020-02-18;2020-03-16;2021-02-04;-18,68 %;352;ja
+Vol-Control 10 %;2025-02-14;2025-04-08;2025-09-22;-11,47 %;220;ja
+Vol-Control 10 %;2021-11-18;2022-06-17;2023-11-14;-11,14 %;726;ja
+Vol-Control 10 %;2018-06-07;2018-12-21;2019-04-01;-10,17 %;298;ja
+Vol-Control 10 %;2024-07-17;2024-08-05;2024-10-16;-6,29 %;91;ja

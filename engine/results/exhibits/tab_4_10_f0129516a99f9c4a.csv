@@ -1,0 +1,9 @@
+﻿# tab_4_10 — Walk-Forward: Folds und Out-of-Sample-Ergebnis
+# Szenario S1 · Lauf-Hash f0129516a99f9c4a · Quelle robustness.walk_forward
+# In-Sample- und Out-of-Sample-Sharpe sind NICHT direkt vergleichbar: der In-Sample-Wert ist das Maximum über die geprüften Zielvolatilitäten und enthält den Selektionsvorteil. Aussagekräftig ist allein der Out-of-Sample-Vergleich über alle Folds: Vol-Control 0,479 gegen Buy-and-Hold 0,793 (Sharpe), -12,73 % gegen -17,93 % (Max. Drawdown).
+Out-of-Sample-Fenster;gewählte Zielvolatilität;In-Sample-Sharpe;Out-of-Sample-Sharpe
+2021-03-16 – 2022-02-25;5,0 %;1,233;1,040
+2022-02-28 – 2023-02-10;15,0 %;1,228;-0,165
+2023-02-13 – 2024-01-29;5,0 %;0,947;1,258
+2024-01-30 – 2025-01-14;5,0 %;0,992;1,911
+2025-01-15 – 2025-12-31;5,0 %;1,124;0,077

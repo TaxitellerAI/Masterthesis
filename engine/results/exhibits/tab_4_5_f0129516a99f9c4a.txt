@@ -1,0 +1,9 @@
+tab_4_5 — H3: Steigung des Effekts über die Krypto-Quote (Datenebene)
+Szenario S1 · Lauf-Hash f0129516a99f9c4a · Quelle hypotheses.sweep_bootstrap.slopes
+
+Zielgröße      Steigung  95 %-Konfidenzintervall    p-Wert  Anteil positiver Replikate
+--------------------------------------------------------------------------------------
+ΔMax-Drawdown  0,709898     [0,383607; 0,965290]  0,000999                     100,0 %
+ΔCVaR 95 %     0,079839     [0,065250; 0,093636]  0,000999                     100,0 %
+
+Data-Level-Bootstrap mit B = 1.000 Replikaten; eine Indexfolge je Replikat für alle Assets UND alle Quoten (gepaartes Design). Der Schätzer rechnet auf einem täglich rebalancierten Brutto-Basisportfolio; die Punktschätzung der Hauptspezifikation (monatlich, netto) liegt bei 0,753635 und damit innerhalb des Intervalls.
