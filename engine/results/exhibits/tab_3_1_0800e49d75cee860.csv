@@ -1,0 +1,11 @@
+﻿# tab_3_1 — Anlageuniversum und Datenverfügbarkeit
+# Szenario S1 · Lauf-Hash 0800e49d75cee860 · Quelle describe.assets
+"# Beobachtungen je Asset auf dem EIGENEN Handelskalender; Krypto handelt ~365 Tage/Jahr, Aktien und Anleihen ~251."
+Asset;Erster Kurs;Letzter Kurs;Beobachtungen;Handelstage/Jahr
+MSCI World;2018-01-03;2025-12-31;2.009;251
+Global Bonds;2018-01-03;2025-12-31;2.009;251
+Gold;2018-01-03;2025-12-31;2.009;251
+Bitcoin;2018-01-03;2025-12-31;2.919;365
+Ethereum;2018-01-03;2025-12-31;2.919;365
+XRP;2018-01-03;2025-12-31;2.919;365
+BNB;2018-01-03;2025-12-31;2.919;365

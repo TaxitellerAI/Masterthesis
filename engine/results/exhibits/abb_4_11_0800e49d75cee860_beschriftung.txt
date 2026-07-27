@@ -1,0 +1,5 @@
+abb_4_11: Out-of-Sample-Vermögensverlauf aus dem Walk-Forward
+
+Aneinandergereihte Out-of-Sample-Fenster; die Zielvolatilität wurde je Fold ausschließlich auf den vorangehenden Daten gewählt.
+
+Szenario S1 · Lauf-Hash 0800e49d75cee860 · Quelle robustness.walk_forward.oos

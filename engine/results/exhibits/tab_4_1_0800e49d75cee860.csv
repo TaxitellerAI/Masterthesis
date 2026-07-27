@@ -1,0 +1,11 @@
+﻿# tab_4_1 — Kennzahlen der Strategien (Hauptspezifikation)
+# Szenario S1 · Lauf-Hash 0800e49d75cee860 · Quelle backtest.metrics
+"# Netto nach Transaktionskosten. Turnover ist für alle Strategien gleich definiert (kumulierte Gewichtsänderung); bei Vol-Control ist er die Summe aus Exposure-Handel und anteiligem Handel des Basisportfolios — siehe tab_4_3. Risk Parity läuft nach einer Warm-up-Phase auf einem kürzeren Sample."
+Strategie;Rendite p.a.;CAGR;Vol p.a.;Sharpe;Max. Drawdown;CVaR 95 %;Turnover;N
+Buy-and-Hold;15,92 %;15,63 %;16,62 %;0,904;-27,14 %;-2,43 %;19,40;2.010
+Vol-Control 5 %;6,13 %;6,18 %;5,25 %;1,000;-9,97 %;-0,75 %;16,22;2.010
+Vol-Control 10 %;11,04 %;11,07 %;10,37 %;0,980;-18,67 %;-1,49 %;29,03;2.010
+Vol-Control 15 %;14,28 %;14,29 %;13,54 %;0,989;-23,55 %;-1,96 %;25,04;2.010
+True Buy-and-Hold (Drift);24,56 %;21,24 %;32,52 %;0,728;-43,71 %;-4,88 %;0,00;2.010
+60/40;8,62 %;8,04 %;13,29 %;0,582;-22,74 %;-1,96 %;8,63;2.010
+Risk Parity;19,35 %;19,68 %;16,57 %;1,112;-20,84 %;-2,34 %;7,66;1.950

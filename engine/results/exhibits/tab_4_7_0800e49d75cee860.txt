@@ -1,0 +1,10 @@
+tab_4_7 — Szenariovergleich der konfirmatorischen Befunde
+Szenario S1/S2/S3 · Lauf-Hash 0800e49d75cee860 · Quelle hypotheses (drei Records)
+
+Szenario                      N   H1 ΔMDD                 H1 BCa  H2 ΔSharpe             H2 BCa  H3 Steigung             H3 KI   Argmax
+---------------------------------------------------------------------------------------------------------------------------------------
+S1 Hauptspezifikation     2.010  8,4662 %  [3,6536 %; 20,2189 %]      0,0753  [-0,1586; 0,3408]       0,7099  [0,3836; 0,9653]  15,00 %
+S2 Point-in-Time          2.765  8,3224 %  [4,4575 %; 18,3026 %]      0,0345  [-0,1429; 0,2303]       0,6469  [0,1982; 0,8169]  50,00 %
+S3 voller Korb inkl. SOL  1.254  7,1329 %  [3,4881 %; 16,7420 %]     -0,1998  [-0,8168; 0,1683]       0,7165  [0,3072; 0,8806]  17,50 %
+
+S2 verwendet einen Point-in-Time-Sleeve (Coins treten ein, sobald investierbar), S3 nimmt Solana auf und verkürzt dafür das Fenster.

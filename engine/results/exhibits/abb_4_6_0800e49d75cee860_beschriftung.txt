@@ -1,0 +1,5 @@
+abb_4_6: Drawdown-Verläufe im Vergleich
+
+Rückgang vom jeweils vorangegangenen Höchststand. Die Vol-Control begrenzt vor allem die TIEFE der Einbrüche — das ist der Mechanismus hinter H1 (tab_4_4). Die tiefsten Einzelepisoden stehen in tab_4_12.
+
+Szenario S1 · Lauf-Hash 0800e49d75cee860 · Quelle timeseries

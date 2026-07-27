@@ -1,0 +1,5 @@
+abb_4_4: Sharpe-Verläufe über die Krypto-Quote (brutto)
+
+BRUTTO — ohne die Kosten der Gewichtsumschichtung. Die Netto-Werte stehen in der Kennzahlentabelle (tab_4_1); die Differenz beträgt rund 0,025 Sharpe-Punkte und geht auf die nicht abgezogenen Umschichtungskosten zurück. Eine Umstellung auf netto wäre eine Methodikänderung und liegt ausserhalb des Ergebnis-Freeze.
+
+Szenario S1 · Lauf-Hash 0800e49d75cee860 · Quelle sweep.points + sweep_bootstrap.bands

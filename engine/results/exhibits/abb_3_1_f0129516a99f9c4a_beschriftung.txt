@@ -1,5 +1,0 @@
-abb_3_1: Korrelationsmatrix der Tagesrenditen
-
-Pearson-Korrelation der Tagesrenditen im gemeinsamen, ausgerichteten Fenster (n = 2.010). Feiertage werden nicht aufgefüllt.
-
-Szenario S1 · Lauf-Hash f0129516a99f9c4a · Quelle describe.correlation

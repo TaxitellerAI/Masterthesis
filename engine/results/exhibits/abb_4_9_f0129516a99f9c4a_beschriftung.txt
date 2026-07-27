@@ -1,5 +1,0 @@
-abb_4_9: Rollierende Sharpe Ratio im Zeitverlauf
-
-Fenster von 126 Handelstagen. Zeigt, in welchen Phasen der Vorsprung entsteht — und dass er nicht gleichmäßig über den Zeitraum anfällt.
-
-Szenario S1 · Lauf-Hash f0129516a99f9c4a · Quelle analytics.rolling

@@ -24,7 +24,10 @@ RECORDS = ["S1", "S2", "S3", "S4_2018", "S4_2019", "S4_2020",
 # not something noticed after submission.
 S1_REFERENCE = {
     "dataset_hash": "715caf81d0dd19d5",
-    "run_hash": "f0129516a99f9c4a",
+    # Changed with the run-hash fix (results-freeze-v2): the spec now covers
+    # crypto_share, target_vol, the weights and every robustness lever. No reported
+    # VALUE moved — proven record by record against the v1 archive.
+    "run_hash": "0800e49d75cee860",
     "h1_bca": (0.036536, 0.202189),
     "h2_bca": (-0.158576, 0.340757),
     "h3_slope": 0.709898,

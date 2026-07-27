@@ -1,5 +1,0 @@
-abb_3_2: Verlauf des verketteten risikofreien Zinses
-
-€STR ab 2019-10-01, davor EONIA abzüglich 8,5 Basispunkten (offizieller EZB-Umstellungsspread). Im Stichprobenfenster war der Zins an 58,8 % der Tage negativ, im Mittel 0,87 % p.a. Er verzinst ausschließlich die nicht investierte Quote der Vol-Control — gerade in den Stressphasen, in denen diese Quote am größten ist.
-
-Szenario S1 · Lauf-Hash f0129516a99f9c4a · Quelle rf_series

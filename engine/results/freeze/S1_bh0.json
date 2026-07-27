@@ -211,10 +211,10 @@
    "trading_days": 252
   },
   "fingerprint": {
-   "hash": "f0129516a99f9c4a",
+   "hash": "a00b7642adbe141d",
    "dataset_hash": "715caf81d0dd19d5",
-   "run_hash": "f0129516a99f9c4a",
-   "hash_exact": "030e6980bae1d528",
+   "run_hash": "a00b7642adbe141d",
+   "hash_exact": "09edb777da7eaa0b",
    "rows": 2010,
    "columns": [
     "MSCI_World",
@@ -234,6 +234,104 @@
    "base_currency": "EUR",
    "scenario": "S1",
    "sleeve_mode": "fixed",
+   "crypto_share": 0.0,
+   "target_vol": 0.1,
+   "assets": null,
+   "mdd_limit": null,
+   "cvar_limit": null,
+   "rf_series_digest": "series:f28b64c0bb100e4f",
+   "cfg_target_vols": [
+    0.05,
+    0.1,
+    0.15
+   ],
+   "cfg_lookback": 60,
+   "cfg_trading_days": 252,
+   "cfg_max_leverage": 1.0,
+   "cfg_vol_method": "rolling",
+   "cfg_ewma_halflife": 20,
+   "cfg_rebalance": "daily",
+   "cfg_weight_rebalance": "monthly",
+   "cfg_dead_band": 0.0,
+   "cfg_rf_mode": "estr_chained",
+   "cfg_rf_annual": 0.03,
+   "cfg_rf_convention": "act360",
+   "cfg_base_currency": "EUR",
+   "cfg_cost_traditional_bps": 10.0,
+   "cfg_cost_crypto_bps": 25.0,
+   "cfg_cvar_alpha": 0.05,
+   "cfg_bootstrap_n": 10000,
+   "cfg_expected_block": 20,
+   "cfg_seed": 42,
+   "cfg_stability_lookbacks": [
+    20,
+    40,
+    60,
+    90,
+    120
+   ],
+   "cfg_stability_target_vols": [
+    0.05,
+    0.075,
+    0.1,
+    0.125,
+    0.15
+   ],
+   "cfg_sweep_max_share": 0.5,
+   "cfg_sweep_step": 0.025,
+   "cfg_subperiods": [
+    [
+     "Vor-COVID",
+     "2015-01-01",
+     "2020-02-19"
+    ],
+    [
+     "COVID-Crash",
+     "2020-02-20",
+     "2020-04-30"
+    ],
+    [
+     "Erholung/Bull",
+     "2020-05-01",
+     "2021-11-10"
+    ],
+    [
+     "Krypto-Winter/Zinswende",
+     "2021-11-11",
+     "2022-12-31"
+    ],
+    [
+     "Post-2022",
+     "2023-01-01",
+     "2100-01-01"
+    ]
+   ],
+   "cfg_traditional": [
+    "MSCI_World",
+    "Global_Bonds",
+    "Gold"
+   ],
+   "cfg_crypto": [
+    "Bitcoin",
+    "Ethereum",
+    "XRP",
+    "BNB",
+    "Solana"
+   ],
+   "cfg_traditional_weights": [
+    [
+     "MSCI_World",
+     0.6
+    ],
+    [
+     "Global_Bonds",
+     0.3
+    ],
+    [
+     "Gold",
+     0.1
+    ]
+   ],
    "effective_start": "2018-01-02",
    "effective_end": "2025-12-31",
    "n_rows": 2011
@@ -6602,7 +6700,7 @@
   "kurtosis_convention": "excess",
   "source": "frozen",
   "base_currency": "EUR",
-  "fetched_at": "2026-07-27T18:49:38.480846+00:00",
+  "fetched_at": "2026-07-27T19:39:44.374183+00:00",
   "requested_window": {
    "start": "2018-01-01",
    "end": "2025-12-31"
@@ -6631,10 +6729,10 @@
    }
   },
   "fingerprint": {
-   "hash": "8f3237581942a02b",
+   "hash": "c28bc38897fdda92",
    "dataset_hash": "715caf81d0dd19d5",
-   "run_hash": "8f3237581942a02b",
-   "hash_exact": "49b492f7e108fa6c",
+   "run_hash": "c28bc38897fdda92",
+   "hash_exact": "b5311b026a1b578c",
    "rows": 2010,
    "columns": [
     "MSCI_World",
@@ -6653,7 +6751,105 @@
    "rf_mode": "estr_chained",
    "base_currency": "EUR",
    "scenario": "S1",
-   "sleeve_mode": "fixed"
+   "sleeve_mode": "fixed",
+   "crypto_share": 0.0,
+   "target_vol": 0.1,
+   "assets": null,
+   "mdd_limit": null,
+   "cvar_limit": null,
+   "rf_series_digest": "series:f28b64c0bb100e4f",
+   "cfg_target_vols": [
+    0.05,
+    0.1,
+    0.15
+   ],
+   "cfg_lookback": 60,
+   "cfg_trading_days": 252,
+   "cfg_max_leverage": 1.0,
+   "cfg_vol_method": "rolling",
+   "cfg_ewma_halflife": 20,
+   "cfg_rebalance": "daily",
+   "cfg_weight_rebalance": "monthly",
+   "cfg_dead_band": 0.0,
+   "cfg_rf_mode": "estr_chained",
+   "cfg_rf_annual": 0.03,
+   "cfg_rf_convention": "act360",
+   "cfg_base_currency": "EUR",
+   "cfg_cost_traditional_bps": 10.0,
+   "cfg_cost_crypto_bps": 25.0,
+   "cfg_cvar_alpha": 0.05,
+   "cfg_bootstrap_n": 10000,
+   "cfg_expected_block": 20,
+   "cfg_seed": 42,
+   "cfg_stability_lookbacks": [
+    20,
+    40,
+    60,
+    90,
+    120
+   ],
+   "cfg_stability_target_vols": [
+    0.05,
+    0.075,
+    0.1,
+    0.125,
+    0.15
+   ],
+   "cfg_sweep_max_share": 0.5,
+   "cfg_sweep_step": 0.025,
+   "cfg_subperiods": [
+    [
+     "Vor-COVID",
+     "2015-01-01",
+     "2020-02-19"
+    ],
+    [
+     "COVID-Crash",
+     "2020-02-20",
+     "2020-04-30"
+    ],
+    [
+     "Erholung/Bull",
+     "2020-05-01",
+     "2021-11-10"
+    ],
+    [
+     "Krypto-Winter/Zinswende",
+     "2021-11-11",
+     "2022-12-31"
+    ],
+    [
+     "Post-2022",
+     "2023-01-01",
+     "2100-01-01"
+    ]
+   ],
+   "cfg_traditional": [
+    "MSCI_World",
+    "Global_Bonds",
+    "Gold"
+   ],
+   "cfg_crypto": [
+    "Bitcoin",
+    "Ethereum",
+    "XRP",
+    "BNB",
+    "Solana"
+   ],
+   "cfg_traditional_weights": [
+    [
+     "MSCI_World",
+     0.6
+    ],
+    [
+     "Global_Bonds",
+     0.3
+    ],
+    [
+     "Gold",
+     0.1
+    ]
+   ]
   },
   "window": {
    "start": "2018-01-03",
@@ -27765,10 +27961,10 @@
  },
  "hashes": {
   "dataset_hash": "715caf81d0dd19d5",
-  "run_hash": "f0129516a99f9c4a"
+  "run_hash": "a00b7642adbe141d"
  },
- "runtime_seconds": 0.61,
- "generated_at": "2026-07-27T18:49:38+00:00",
+ "runtime_seconds": 0.62,
+ "generated_at": "2026-07-27T19:39:44+00:00",
  "environment": {
   "python": "3.14.4",
   "platform": "Darwin 25.6.0 arm64",
@@ -27778,8 +27974,8 @@
   "statsmodels": "0.14.6"
  },
  "git": {
-  "commit": "35beaceae20509cafcf7c0ac4c75389691b2462f",
-  "describe": "results-freeze-v1-2-g35beace",
-  "dirty": false
+  "commit": "37fd45d753a7e141829ccaa29694961bb593a786",
+  "describe": "results-freeze-v1-3-g37fd45d-dirty",
+  "dirty": true
  }
 }

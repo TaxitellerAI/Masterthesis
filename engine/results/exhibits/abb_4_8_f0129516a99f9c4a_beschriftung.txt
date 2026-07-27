@@ -1,5 +1,0 @@
-abb_4_8: Sharpe Ratio in Abhängigkeit von den Transaktionskosten
-
-Die Basisannahme ist ein gemischter Satz aus 10 Basispunkten für traditionelle Anlagen und 25 für Kryptowerte, gewichtet mit der Quote.
-
-Szenario S1 · Lauf-Hash f0129516a99f9c4a · Quelle robustness.cost_sensitivity

@@ -1,0 +1,8 @@
+﻿# tab_4_3 — Zerlegung des Turnovers
+# Szenario S1 · Lauf-Hash 0800e49d75cee860 · Quelle backtest.metrics (turnover*)
+# Vol-Control handelt auf zwei Ebenen: sie verändert die Investitionsquote und trägt zugleich ihren Anteil an der Umschichtung des Basisportfolios. Auf vergleichbarer Basis handelt sie MEHR als Buy-and-Hold, nicht weniger.
+Strategie;Gesamt;davon Exposure-Handel;davon Basisportfolio;Verhältnis zu Buy-and-Hold
+Vol-Control 5 %;16,2161;9,7224;6,4936;0,84
+Vol-Control 10 %;29,0326;16,2307;12,8018;1,50
+Vol-Control 15 %;25,0440;8,7592;16,2848;1,29
+Buy-and-Hold;19,3952;—;19,3952;1,00

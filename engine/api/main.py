@@ -351,11 +351,91 @@ def _limit_flags(table: list, req: RunRequest) -> list:
     return table
 
 
+def _spec_value(v):
+    """Repr-stable normalisation for the fingerprint spec.
+
+    Floats are quantised to 1e-12 for the same reason `stable_data_hash` does it:
+    the run hash must be identical on macOS and on the deployed Linux host.
+    """
+    if isinstance(v, bool) or v is None:
+        return v
+    if isinstance(v, float):
+        return round(v, 12)
+    if isinstance(v, (list, tuple)):
+        return tuple(_spec_value(x) for x in v)
+    if isinstance(v, dict):
+        return tuple(sorted((k, _spec_value(x)) for k, x in v.items()))
+    return v
+
+
+def _rf_series_digest(req: RunRequest) -> str:
+    """Stable digest of the risk-free INPUT in force for this run.
+
+    The rf series is a SECOND data input, and `dataset_hash` covers the price matrix
+    only. Without this, swapping the frozen €STR/EONIA file would move every
+    vol-control number — the cash leg is (1 - exposure) * rf — while both published
+    hashes stayed put. It belongs in the run hash, not the dataset hash, because the
+    latter is defined to vouch for the price data alone.
+
+    Deliberately digests the SOURCE series, not the windowed slice: the slice is
+    already pinned by the window keys, and hashing the source is what detects a
+    swapped input file across every scenario at once. Note that `_cfg(req)` alone
+    cannot be used here — the realised series is injected later, in `_prepared`, so
+    reading `cfg.rf_series` at this point would always report the constant fallback.
+    """
+    import hashlib
+    import numpy as np
+    if _rf_mode(req) != "estr_chained":
+        return f"constant:{round(float(req.rf_annual), 12)}"
+    try:
+        ser, _meta = _frozen_rf()
+    except Exception as e:                       # missing/corrupt frozen rf file
+        return f"unavailable:{type(e).__name__}"
+    arr = np.ascontiguousarray(
+        np.round(np.asarray(ser.to_numpy(), dtype="float64"), 12))
+    return "series:" + hashlib.sha256(arr.tobytes()).hexdigest()[:16]
+
+
 def _run_spec(req: RunRequest) -> dict:
-    """The choices that DEFINE a run — hashed into the fingerprint so a citable
-    result can never be confused with one from a different window or rf mode."""
+    """Every choice that DEFINES a run — hashed into the run fingerprint.
+
+    What goes in
+    ------------
+    * The sample selection: source, requested window, scenario, sleeve mode.
+    * The portfolio choices that live on the REQUEST and have no EngineConfig field:
+      `crypto_share`, `target_vol`, an explicit `assets` subset, and the two risk
+      limits (they change the flags the response reports).
+    * EVERY value-bearing field of the effective `EngineConfig`, enumerated from the
+      dataclass itself rather than written out here — target vols, lookback, trading
+      days, leverage cap, vol estimator and its half-life, BOTH rebalancing grids,
+      dead band, rf mode/rate/convention, cost rates, CVaR level, bootstrap size,
+      block length, seed, the stability and sweep grids, the regime definitions, the
+      asset universe and the traditional weights. Enumerating from
+      `dataclasses.fields` is deliberate: a parameter added to EngineConfig later is
+      then covered automatically instead of silently escaping the hash.
+    * A digest of the realised rf series (see `_rf_series_digest`).
+
+    What deliberately stays OUT
+    ---------------------------
+    * `rf_series` itself — it is data, not a setting, and enters through its digest.
+    * The dataset hash, which is computed separately and vouches for the PRICE data
+      alone. That separation is intentional: two runs on identical data with
+      different parameters must share a dataset hash and differ in the run hash.
+    * Endpoint-level overrides of `bootstrap_n` (`API_BOOTSTRAP_N`, `SWEEP_BOOT_N`).
+      They are constants of the deployed code, not user choices, and the cache key
+      `_analysis_key` already carries them.
+
+    Why this is not cosmetic: before this, `crypto_share`, `target_vol`, the weights
+    and every robustness lever were absent, so S1 and three records with 0 %, 25 %
+    and 50 % crypto all reported the run hash f0129516a99f9c4a — four different
+    portfolios behind one identifier that claims to vouch for the configuration.
+    """
+    import dataclasses
     spec = _spec_for(req)
+    cfg = _cfg(req)
     out = {
+        # Kept verbatim so the response shape stays backward compatible; the same
+        # values also appear below under their cfg_ names, which is harmless.
         "source": req.source,
         "window_start": spec.start if spec else req.start,
         "window_end": spec.end if spec else req.end,
@@ -363,7 +443,18 @@ def _run_spec(req: RunRequest) -> dict:
         "base_currency": req.base_currency.upper(),
         "scenario": spec.name if spec else "custom",
         "sleeve_mode": spec.sleeve_mode if spec else "fixed",
+        # Request-level portfolio choices — the gap this function was fixed for.
+        "crypto_share": _spec_value(float(req.crypto_share)),
+        "target_vol": _spec_value(float(req.target_vol)),
+        "assets": _spec_value(sorted(req.assets)) if req.assets else None,
+        "mdd_limit": _spec_value(req.mdd_limit),
+        "cvar_limit": _spec_value(req.cvar_limit),
+        "rf_series_digest": _rf_series_digest(req),
     }
+    for f in dataclasses.fields(cfg):
+        if not f.compare:          # rf_series: data, covered by its digest instead
+            continue
+        out["cfg_" + f.name] = _spec_value(getattr(cfg, f.name))
     return out
 
 

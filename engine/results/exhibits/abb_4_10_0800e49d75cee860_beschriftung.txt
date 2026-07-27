@@ -1,0 +1,5 @@
+abb_4_10: Verteilung der Tagesrenditen mit CVaR-Markierung
+
+Die Vol-Control staucht vor allem den linken Rand — genau das ist der Mechanismus hinter H1. Gestrichelte Linien markieren den CVaR 95 %.
+
+Szenario S1 · Lauf-Hash 0800e49d75cee860 · Quelle analytics.distribution

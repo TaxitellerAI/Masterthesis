@@ -1,0 +1,5 @@
+abb_4_5: Bootstrap-Verteilung der optimalen Krypto-Quote
+
+Wie oft jede Quote in den Replikaten die beste war. Der Bereich, den die Daten statistisch NICHT voneinander unterscheiden können, reicht von 0 % bis 50 % und umfasst damit die GESAMTE untersuchte Bandbreite. Die Punktschätzung von 15 % ist deshalb kein Optimum, sondern der Modus einer weitgehend flachen Verteilung. Der erhöhte Balken am rechten Rand (13,5 % bei 50 %) ist ein Randeffekt: die beste Quote kann dort nicht nach rechts ausweichen, weshalb sich Replikate mit weiter steigendem Effekt an der Obergrenze sammeln.
+
+Szenario S1 · Lauf-Hash 0800e49d75cee860 · Quelle sweep_bootstrap.argmax

@@ -1,0 +1,16 @@
+tab_3_2 — Sample-Designs und Reproduktionsanker
+Szenario alle · Lauf-Hash 0800e49d75cee860 · Quelle backtest.sample + hashes
+
+Record       Beginn        Ende  Kurszeilen  Renditetage  Assets           Korb    Datensatz-Hash         Lauf-Hash
+-------------------------------------------------------------------------------------------------------------------
+S1       2018-01-02  2025-12-31       2.011        2.010       7    fester Korb  715caf81d0dd19d5  0800e49d75cee860
+S2       2015-01-02  2025-12-31       2.766        2.765       8  Point-in-Time  ebf5ba110371d633  1b58b85abc757380
+S3       2021-01-04  2025-12-31       1.255        1.254       8    fester Korb  f10f75b3cc68093b  bf7e43da9c3e41dd
+S4_2018  2018-01-02  2025-12-31       2.011        2.010       7    fester Korb  715caf81d0dd19d5  6922149ae914cad9
+S4_2019  2019-01-02  2025-12-31       1.760        1.759       7    fester Korb  393b9fff8c45e318  3a194ad53a9e4ee1
+S4_2020  2020-01-02  2025-12-31       1.508        1.507       7    fester Korb  4aaa25e937fa7322  78ddb5a119a61909
+S4_2021  2021-01-04  2025-12-31       1.255        1.254       7    fester Korb  43c7318e1fb4c7a6  2d3c4fe804d9ca54
+S4_2022  2022-01-03  2025-12-31       1.003        1.002       7    fester Korb  282cd7a47293c575  e1703345e9eab7b3
+S1_rf3   2018-01-02  2025-12-31       2.011        2.010       7    fester Korb  715caf81d0dd19d5  6489ea1e67c046fc
+
+Kurszeilen und Renditetage unterscheiden sich um eins — die erste Kurszeile erzeugt keine Rendite. S4_2018 teilt die Datenbasis mit S1 (gleicher Datensatz-Hash), unterscheidet sich aber in der Konfiguration (anderer Lauf-Hash).

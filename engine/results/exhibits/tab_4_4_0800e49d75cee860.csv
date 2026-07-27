@@ -1,0 +1,6 @@
+﻿# tab_4_4 — Konfirmatorische Hypothesentests H1 und H2
+# Szenario S1 · Lauf-Hash 0800e49d75cee860 · Quelle hypotheses.H1/H2 + holm_adjusted
+# Gepaarter stationärer Block-Bootstrap, Vol-Control 10 % gegen Buy-and-Hold. BCa nach Efron (1987) mit vollem Delete-1-Jackknife. Holm-Korrektur über die vier konfirmatorischen Tests.
+Hypothese;Beobachtete Differenz;BCa-Intervall 95 %;Perzentil-Intervall 95 %;p-Wert;Holm-adjustiert;Beurteilung
+H1: Drawdown-Reduktion;8,4662 %;"[3,6536 %; 20,2189 %]";"[2,5899 %; 16,9866 %]";0,0000;0,0000;signifikant
+H2: Sharpe-Differenz;0,0753;"[-0,1586; 0,3408]";"[-0,1651; 0,3283]";0,5683;0,5683;nicht signifikant

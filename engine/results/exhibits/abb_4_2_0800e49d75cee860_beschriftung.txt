@@ -1,0 +1,5 @@
+abb_4_2: Investitionsquote der Vol-Control im Zeitverlauf
+
+Die Quote ist auf 100 % gedeckelt — es wird nicht gehebelt. Bei Zielvol 15 % liegt sie an 58,1 % der Handelstage an dieser Grenze, bei 5 % an keinem einzigen. Das erklärt den nicht-monotonen Turnover in tab_4_3: eine Quote am Anschlag bewegt sich nicht mehr.
+
+Szenario S1 · Lauf-Hash 0800e49d75cee860 · Quelle timeseries

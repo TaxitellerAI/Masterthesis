@@ -56,7 +56,7 @@ function buildNotes(negTxt: string | null): { title: string; body: string }[] { 
   {
     title: "Untersuchungszeitraum & Reproduzierbarkeit",
     body:
-      "Das Datenfenster ist mit festen Kalendergrenzen definiert (01.01.2018 – 31.12.2025, acht volle Jahre), nicht als rollierendes 'letzte N Jahre' — sonst lieferte jeder Abruf einen anderen Datenstand und keine berichtete Zahl wäre zitierfähig. 2018 ist zugleich das erste Jahr mit vollständiger Historie aller Default-Kryptowerte. Kurse und Zinsreihe sind als Snapshot eingefroren. Ausgewiesen werden ZWEI Anker: der Datensatz-Hash bürgt für die Datenbasis allein, der Lauf-Hash zusätzlich für Fenstergrenzen, Datenquelle, Zinsmodus und Gewichte — zwei Läufe mit unterschiedlichen Annahmen können also nie denselben Lauf-Hash tragen. Beide sind auf 1e-12 quantisiert und damit plattformunabhängig reproduzierbar (der byte-exakte Digest unterscheidet sich zwischen macOS und Linux um ein letztes Bit und taugt deshalb nicht als zitierfähiger Wert).",
+      "Das Datenfenster ist mit festen Kalendergrenzen definiert (01.01.2018 – 31.12.2025, acht volle Jahre), nicht als rollierendes 'letzte N Jahre' — sonst lieferte jeder Abruf einen anderen Datenstand und keine berichtete Zahl wäre zitierfähig. 2018 ist zugleich das erste Jahr mit vollständiger Historie aller Default-Kryptowerte. Kurse und Zinsreihe sind als Snapshot eingefroren. Ausgewiesen werden ZWEI Anker: der Datensatz-Hash bürgt für die Datenbasis allein, der Lauf-Hash zusätzlich für die vollständige Konfiguration: Szenario, Fenster, Datenquelle, Krypto-Quote, Zielvolatilität, Basisgewichte, beide Rebalancing-Raster, Volatilitätsschätzer und Lookback, Hebelgrenze, Totband, Kostensätze, CVaR-Niveau, Bootstrap-Parameter und Seed sowie einen Digest der verwendeten Zinsreihe. Die Menge wird programmatisch aus der Engine-Konfiguration abgeleitet, damit ein später ergänzter Parameter nicht unbemerkt aus dem Hash fällt. Zwei Läufe mit unterschiedlichen Annahmen können deshalb nie denselben Lauf-Hash tragen. Beide sind auf 1e-12 quantisiert und damit plattformunabhängig reproduzierbar (der byte-exakte Digest unterscheidet sich zwischen macOS und Linux um ein letztes Bit und taugt deshalb nicht als zitierfähiger Wert).",
   },
   {
     title: "Fehlende Werte im Kurspanel",
@@ -172,7 +172,7 @@ export default function InfoNotes({
             </span>
             <span>
               Lauf-Hash{" "}
-              <span className="text-ink" title="Bürgt für Datenbasis UND Konfiguration (Szenario, Fenster, Zinsmodus …).">
+              <span className="text-ink" title="Bürgt für Datenbasis UND die vollständige Konfiguration: Szenario, Fenster, Quelle, Krypto-Quote, Zielvolatilität, Gewichte, Rebalancing, Schätzer, Kosten, Seed und die Zinsreihe.">
                 {fingerprint.run_hash ?? fingerprint.hash}
               </span>
             </span>
@@ -201,8 +201,9 @@ export default function InfoNotes({
       <p className="text-faint text-xs mt-2 leading-snug">
         Diese Punkte sind Diskussions-/Annahme-Hinweise für die schriftliche Arbeit — keine berechneten
         Ergebnisse. Der <strong>Datensatz-Hash</strong> bürgt für die Datenbasis allein, der{" "}
-        <strong>Lauf-Hash</strong> zusätzlich für die Konfiguration (Szenario, Fenster,
-        Zinsmodus, Gewichte). Beide sind plattformunabhängig reproduzierbar; der{" "}
+        <strong>Lauf-Hash</strong> zusätzlich für die vollständige Konfiguration — neben
+        Szenario, Fenster und Zinsmodus auch Krypto-Quote, Zielvolatilität, Gewichte und
+        jeden Robustheitsschalter. Beide sind plattformunabhängig reproduzierbar; der{" "}
         <strong>Datensatz-Export</strong> friert die verwendeten Kurse als CSV ein (Hash im Dateinamen)
         und der <strong>Konfigurations-Link</strong> stellt genau diese Auswertung wieder her. Für die
         vollständige Nachvollziehbarkeit steht zudem der <strong>Excel-Export</strong> bereit: alle

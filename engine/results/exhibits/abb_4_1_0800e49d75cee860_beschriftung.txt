@@ -1,0 +1,5 @@
+abb_4_1: Vermögensverlauf der Strategien
+
+Aus 1 Euro zu Beginn des Stichprobenfensters, netto nach Transaktionskosten. True Buy-and-Hold driftet ohne Rebalancing und erreicht das höchste Endvermögen bei zugleich tiefstem Drawdown (tab_4_1) — Rendite und Risiko sind hier nicht zu trennen.
+
+Szenario S1 · Lauf-Hash 0800e49d75cee860 · Quelle timeseries
