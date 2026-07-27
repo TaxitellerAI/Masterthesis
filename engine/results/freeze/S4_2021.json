@@ -1058,7 +1058,7 @@
      0.265344
     ]
    },
-   "runtime_seconds": 4.29,
+   "runtime_seconds": 4.28,
    "sample": {
     "scenario": "S4_2021",
     "label": "Startjahr 2021 (Sensitivität)",
@@ -7707,7 +7707,7 @@
   "kurtosis_convention": "excess",
   "source": "frozen",
   "base_currency": "EUR",
-  "fetched_at": "2026-07-27T18:16:05.008997+00:00",
+  "fetched_at": "2026-07-27T18:49:25.768589+00:00",
   "requested_window": {
    "start": "2018-01-01",
    "end": "2025-12-31"
@@ -27181,7 +27181,7 @@
   "run_hash": "92be61991a3fa7c1"
  },
  "runtime_seconds": 5.23,
- "generated_at": "2026-07-27T18:16:05+00:00",
+ "generated_at": "2026-07-27T18:49:25+00:00",
  "environment": {
   "python": "3.14.4",
   "platform": "Darwin 25.6.0 arm64",
@@ -27191,8 +27191,8 @@
   "statsmodels": "0.14.6"
  },
  "git": {
-  "commit": "4b9185c5889ae3563970482c381e53660c103f6b",
-  "describe": "results-freeze-v1-1-g4b9185c-dirty",
-  "dirty": true
+  "commit": "35beaceae20509cafcf7c0ac4c75389691b2462f",
+  "describe": "results-freeze-v1-2-g35beace",
+  "dirty": false
  }
 }

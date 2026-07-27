@@ -1,16 +1,16 @@
 # Ergebnis-Freeze — Archivübersicht
 
-Erzeugt: 2026-07-27T18:15:36+00:00  
-Commit: `results-freeze-v1-1-g4b9185c-dirty` (4b9185c5889ae3563970482c381e53660c103f6b)  **ACHTUNG: Arbeitsbaum war nicht sauber**
+Erzeugt: 2026-07-27T18:48:57+00:00  
+Commit: `results-freeze-v1-2-g35beace` (35beaceae20509cafcf7c0ac4c75389691b2462f)
 Umgebung: Python 3.14.4 · numpy 2.5.0 · pandas 3.0.3 · scipy 1.18.0 · statsmodels 0.14.6 · Darwin 25.6.0 arm64
 
 | Record | Fenster | n | Datensatz-Hash | Lauf-Hash | Laufzeit |
 |---|---|---:|---|---|---:|
 | S1 | 2018-01-02–2025-12-31 | 2010 | `715caf81d0dd19d5` | `f0129516a99f9c4a` | 0.6s |
-| S2 | 2015-01-02–2025-12-31 | 2765 | `ebf5ba110371d633` | `f3e55eb08c91c93b` | 0.7s |
+| S2 | 2015-01-02–2025-12-31 | 2765 | `ebf5ba110371d633` | `f3e55eb08c91c93b` | 0.6s |
 | S3 | 2021-01-04–2025-12-31 | 1254 | `f10f75b3cc68093b` | `6cb43825ee6860a3` | 0.5s |
-| S4_2018 | 2018-01-02–2025-12-31 | 2010 | `715caf81d0dd19d5` | `eade5ce249da9ebb` | 8.4s |
-| S4_2019 | 2019-01-02–2025-12-31 | 1759 | `393b9fff8c45e318` | `4b3c9e6e5d94c226` | 7.1s |
+| S4_2018 | 2018-01-02–2025-12-31 | 2010 | `715caf81d0dd19d5` | `eade5ce249da9ebb` | 8.5s |
+| S4_2019 | 2019-01-02–2025-12-31 | 1759 | `393b9fff8c45e318` | `4b3c9e6e5d94c226` | 7.2s |
 | S4_2020 | 2020-01-02–2025-12-31 | 1507 | `4aaa25e937fa7322` | `9ee0b737af2a6365` | 6.2s |
 | S4_2021 | 2021-01-04–2025-12-31 | 1254 | `43c7318e1fb4c7a6` | `92be61991a3fa7c1` | 5.2s |
 | S4_2022 | 2022-01-03–2025-12-31 | 1002 | `282cd7a47293c575` | `a3838800c6c7407e` | 4.3s |
