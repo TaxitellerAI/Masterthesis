@@ -212,6 +212,36 @@ def test_timeseries_and_rf_blocks_present():
           f"timeseries für drei Zielvolatilitäten in allen geprüften Records")
 
 
+def test_reproducibility_table_covers_every_record():
+    """tab_a_1 is the appendix's reproducibility proof — it must list every archived
+    record, and every run hash in it must be unique.
+
+    Both halves have already failed once: the record list was hard-coded and fell
+    behind when the archive grew, and before the run-hash fix four records shared one
+    hash. A table that omits records or repeats an identifier defeats its own purpose.
+    """
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+    import exhibits
+    _header, rows, _h = _read("tab_a_1")
+    listed = [r[0] for r in rows]
+    archived = exhibits.all_records()
+    assert listed == archived, f"tab_a_1 fuehrt {listed}, Archiv hat {archived}"
+    run_hashes = [r[2] for r in rows]
+    assert len(set(run_hashes)) == len(run_hashes), (
+        f"Doppelte Lauf-Hashes: "
+        f"{[h for h in run_hashes if run_hashes.count(h) > 1]}")
+    for row in rows:
+        r = _rec(row[0])
+        assert row[1] == r["hashes"]["dataset_hash"], f"{row[0]}: Datensatz-Hash"
+        assert row[2] == r["hashes"]["run_hash"], f"{row[0]}: Lauf-Hash"
+    # The two-anchor design made visible: same data, different configuration.
+    shared = [r[0] for r in rows if r[1] == _rec("S1")["hashes"]["dataset_hash"]]
+    assert len(shared) > 1, "Kein Record teilt die Datenbasis mit S1"
+    print(f"ok  tab_a_1: {len(rows)} Records, {len(set(run_hashes))} verschiedene "
+          f"Lauf-Hashes; {len(shared)} teilen die Datenbasis von S1 bei "
+          f"unterschiedlicher Konfiguration")
+
+
 def test_every_file_carries_its_run_hash():
     """The hash in the filename must be the hash of the record the exhibit came from —
     that link is what makes the appendix defensible."""
@@ -270,5 +300,6 @@ if __name__ == "__main__":
     test_tab_4_9_rf_pair()
     test_tab_4_2_matches_crypto_share_records()
     test_timeseries_and_rf_blocks_present()
+    test_reproducibility_table_covers_every_record()
     test_every_file_carries_its_run_hash()
     test_register_matches_declared_gaps()

@@ -12,5 +12,8 @@ S4_2020  2020-01-02  2025-12-31       1.508        1.507       7    fester Korb 
 S4_2021  2021-01-04  2025-12-31       1.255        1.254       7    fester Korb  43c7318e1fb4c7a6  2d3c4fe804d9ca54
 S4_2022  2022-01-03  2025-12-31       1.003        1.002       7    fester Korb  282cd7a47293c575  e1703345e9eab7b3
 S1_rf3   2018-01-02  2025-12-31       2.011        2.010       7    fester Korb  715caf81d0dd19d5  6489ea1e67c046fc
+S1_bh0   2018-01-02  2025-12-31       2.011        2.010       7    fester Korb  715caf81d0dd19d5  a00b7642adbe141d
+S1_bh25  2018-01-02  2025-12-31       2.011        2.010       7    fester Korb  715caf81d0dd19d5  df0ceee30992a7db
+S1_bh50  2018-01-02  2025-12-31       2.011        2.010       7    fester Korb  715caf81d0dd19d5  7f5a73de235c8986
 
 Kurszeilen und Renditetage unterscheiden sich um eins — die erste Kurszeile erzeugt keine Rendite. S4_2018 teilt die Datenbasis mit S1 (gleicher Datensatz-Hash), unterscheidet sich aber in der Konfiguration (anderer Lauf-Hash).

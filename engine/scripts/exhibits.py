@@ -52,6 +52,18 @@ REGISTER: list[dict] = []
 _CACHE: dict[str, dict] = {}
 
 
+def all_records() -> list[str]:
+    """Every record in the archive, in the order freeze_run.py writes them.
+
+    Derived, never hand-listed: tab_3_2 and tab_a_1 had a literal list and silently
+    omitted S1_bh0/25/50 the moment the archive grew — an appendix that vouches for
+    reproducibility must not itself fall behind the archive it describes.
+    """
+    from freeze_run import RECORDS
+    return [n for n, _ov in RECORDS
+            if os.path.exists(os.path.join(ARCHIVE, f"{n}.json"))]
+
+
 def rec(name: str) -> dict:
     if name not in _CACHE:
         with open(os.path.join(ARCHIVE, f"{name}.json")) as f:
@@ -178,7 +190,7 @@ def tab_3_1():
 
 
 def tab_3_2():
-    names = ["S1", "S2", "S3", "S4_2018", "S4_2019", "S4_2020", "S4_2021", "S4_2022", "S1_rf3"]
+    names = all_records()
     rows = []
     for n in names:
         s = rec(n)["backtest"]["sample"]
@@ -684,7 +696,7 @@ def abb_4_12():
 
 # ── Anhang ───────────────────────────────────────────────────────────────────
 def tab_a_1():
-    names = ["S1", "S2", "S3", "S4_2018", "S4_2019", "S4_2020", "S4_2021", "S4_2022", "S1_rf3"]
+    names = all_records()
     e = rec("S1")["environment"]
     rows = []
     for n in names:
