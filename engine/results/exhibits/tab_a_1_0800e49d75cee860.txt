@@ -3,17 +3,17 @@ Szenario alle · Lauf-Hash 0800e49d75cee860 · Quelle hashes + git + environment
 
 Record     Datensatz-Hash         Lauf-Hash                        Commit                    Erzeugt  Laufzeit
 --------------------------------------------------------------------------------------------------------------
-S1       715caf81d0dd19d5  0800e49d75cee860  results-freeze-v1-4-gf8b490d  2026-07-27T19:42:28+00:00     0,7 s
-S2       ebf5ba110371d633  1b58b85abc757380  results-freeze-v1-4-gf8b490d  2026-07-27T19:42:29+00:00     0,7 s
-S3       f10f75b3cc68093b  bf7e43da9c3e41dd  results-freeze-v1-4-gf8b490d  2026-07-27T19:42:30+00:00     0,5 s
-S4_2018  715caf81d0dd19d5  6922149ae914cad9  results-freeze-v1-4-gf8b490d  2026-07-27T19:42:38+00:00     8,5 s
-S4_2019  393b9fff8c45e318  3a194ad53a9e4ee1  results-freeze-v1-4-gf8b490d  2026-07-27T19:42:45+00:00     7,1 s
-S4_2020  4aaa25e937fa7322  78ddb5a119a61909  results-freeze-v1-4-gf8b490d  2026-07-27T19:42:52+00:00     6,2 s
-S4_2021  43c7318e1fb4c7a6  2d3c4fe804d9ca54  results-freeze-v1-4-gf8b490d  2026-07-27T19:42:57+00:00     5,3 s
-S4_2022  282cd7a47293c575  e1703345e9eab7b3  results-freeze-v1-4-gf8b490d  2026-07-27T19:43:01+00:00     4,3 s
-S1_rf3   715caf81d0dd19d5  6489ea1e67c046fc  results-freeze-v1-4-gf8b490d  2026-07-27T19:43:09+00:00     7,8 s
-S1_bh0   715caf81d0dd19d5  a00b7642adbe141d  results-freeze-v1-4-gf8b490d  2026-07-27T19:43:10+00:00     0,6 s
-S1_bh25  715caf81d0dd19d5  df0ceee30992a7db  results-freeze-v1-4-gf8b490d  2026-07-27T19:43:10+00:00     0,6 s
-S1_bh50  715caf81d0dd19d5  7f5a73de235c8986  results-freeze-v1-4-gf8b490d  2026-07-27T19:43:11+00:00     0,6 s
+S1       715caf81d0dd19d5  0800e49d75cee860  results-freeze-v1-5-g9e9bd35  2026-07-27T19:47:27+00:00     0,6 s
+S2       ebf5ba110371d633  1b58b85abc757380  results-freeze-v1-5-g9e9bd35  2026-07-27T19:47:27+00:00     0,7 s
+S3       f10f75b3cc68093b  bf7e43da9c3e41dd  results-freeze-v1-5-g9e9bd35  2026-07-27T19:47:28+00:00     0,5 s
+S4_2018  715caf81d0dd19d5  6922149ae914cad9  results-freeze-v1-5-g9e9bd35  2026-07-27T19:47:36+00:00     8,4 s
+S4_2019  393b9fff8c45e318  3a194ad53a9e4ee1  results-freeze-v1-5-g9e9bd35  2026-07-27T19:47:44+00:00     7,2 s
+S4_2020  4aaa25e937fa7322  78ddb5a119a61909  results-freeze-v1-5-g9e9bd35  2026-07-27T19:47:50+00:00     6,2 s
+S4_2021  43c7318e1fb4c7a6  2d3c4fe804d9ca54  results-freeze-v1-5-g9e9bd35  2026-07-27T19:47:55+00:00     5,3 s
+S4_2022  282cd7a47293c575  e1703345e9eab7b3  results-freeze-v1-5-g9e9bd35  2026-07-27T19:48:00+00:00     4,5 s
+S1_rf3   715caf81d0dd19d5  6489ea1e67c046fc  results-freeze-v1-5-g9e9bd35  2026-07-27T19:48:08+00:00     7,8 s
+S1_bh0   715caf81d0dd19d5  a00b7642adbe141d  results-freeze-v1-5-g9e9bd35  2026-07-27T19:48:08+00:00     0,6 s
+S1_bh25  715caf81d0dd19d5  df0ceee30992a7db  results-freeze-v1-5-g9e9bd35  2026-07-27T19:48:09+00:00     0,6 s
+S1_bh50  715caf81d0dd19d5  7f5a73de235c8986  results-freeze-v1-5-g9e9bd35  2026-07-27T19:48:09+00:00     0,6 s
 
 Umgebung für alle Records: Python 3.14.4, numpy 2.5.0, pandas 3.0.3, scipy 1.18.0, statsmodels 0.14.6, Darwin 25.6.0 arm64. Der Datensatz-Hash bürgt für die Datenbasis allein, der Lauf-Hash zusätzlich für Fenster, Quelle, Zinsmodus und Gewichte. Beide sind auf 1e-12 quantisiert und damit plattformunabhängig.
