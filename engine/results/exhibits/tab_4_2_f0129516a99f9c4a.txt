@@ -1,0 +1,11 @@
+tab_4_2 — Teilfrage 1: Risiko-Rendite-Profil des STATISCHEN Portfolios je Krypto-Quote
+Szenario S1_bh0/S1/S1_bh25/S1_bh50 · Lauf-Hash f0129516a99f9c4a · Quelle backtest.metrics[BuyHold]
+
+Krypto-Quote  Rendite p.a.     CAGR  Vol p.a.  Sharpe  Max. Drawdown  CVaR 95 %  Turnover
+-----------------------------------------------------------------------------------------
+0 %                 9,99 %   9,50 %   13,50 %   0,674       -23,10 %    -1,98 %      9,38
+10 %               15,92 %  15,63 %   16,62 %   0,904       -27,14 %    -2,43 %     19,40
+25 %               24,58 %  23,87 %   25,09 %   0,944       -33,64 %    -3,63 %     33,72
+50 %               38,54 %  34,90 %   41,35 %   0,910       -55,70 %    -6,01 %     47,26
+
+OHNE Volatilitätssteuerung — das monatlich rebalancierte Buy-and-Hold-Portfolio bei verschiedenen Krypto-Anteilen. Netto nach Transaktionskosten und damit direkt vergleichbar mit tab_4_1. Genau diese Zeilen beantworten Teilfrage 1; die Vol-Control-Ergebnisse ab tab_4_4 setzen darauf auf. Der traditionelle Teil bleibt intern im Verhältnis 60/30/10 aufgeteilt.

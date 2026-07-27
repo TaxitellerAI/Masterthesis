@@ -164,6 +164,54 @@ def test_tab_4_9_rf_pair():
     print(f"ok  tab_4_9: {checked} Werte inkl. korrekt berechneter Differenzspalte")
 
 
+def test_tab_4_2_matches_crypto_share_records():
+    """Teilfrage-1-Tabelle — four SEPARATE records, one row each. The failure mode
+    this covers is a row silently showing the wrong record's portfolio: all four
+    share the same run hash (the fingerprint does not cover crypto_share), so the
+    filename cannot distinguish them and only the values can."""
+    header, rows, _h = _read("tab_4_2")
+    assert header[0] == "Krypto-Quote", header
+    assert len(rows) == 4, f"{len(rows)} Zeilen statt 4"
+    expected = [("S1_bh0", 0.0), ("S1", 0.10), ("S1_bh25", 0.25), ("S1_bh50", 0.50)]
+    checked = 0
+    for row, (name, share) in zip(rows, expected):
+        r = _rec(name)
+        assert abs(r["backtest"]["crypto_share"] - share) < 1e-9, (
+            f"{name} traegt Quote {r['backtest']['crypto_share']}, erwartet {share}")
+        assert abs(num(row[0]) - share) < 1e-9, f"{name}: Quote in Spalte 1"
+        m = next(x for x in r["backtest"]["metrics"] if x["strategy"] == "BuyHold")
+        for idx, key, tol in ((1, "ann_return", 5e-5), (2, "cagr", 5e-5),
+                              (3, "ann_vol", 5e-5), (4, "sharpe", 5e-4),
+                              (5, "max_drawdown", 5e-5), (6, "cvar_95", 5e-5),
+                              (7, "turnover", 5e-3)):
+            got, want = num(row[idx]), m[key]
+            assert abs(got - want) < tol, f"{name}.{key}: Exhibit {got} vs Archiv {want}"
+            checked += 1
+    # A higher crypto share must move the portfolio — identical rows would mean the
+    # generator read the same record four times.
+    assert len({r[1] for r in rows}) == 4, "Vier identische Renditen — Records vertauscht?"
+    assert num(rows[0][5]) > num(rows[3][5]), "Drawdown wird mit mehr Krypto nicht tiefer"
+    print(f"ok  tab_4_2: {checked} Werte aus vier Records, Quoten und Monotonie geprüft")
+
+
+def test_timeseries_and_rf_blocks_present():
+    """The additive archive extension must actually be in every record."""
+    for name in ("S1", "S2", "S3", "S1_rf3"):
+        r = _rec(name)
+        assert "rf_series" in r and r["rf_series"]["dates"], f"{name}: rf_series fehlt"
+        assert len(r["rf_series"]["dates"]) == len(r["rf_series"]["daily"])
+        ts = r.get("timeseries")
+        assert ts and set(ts) == {"vol_5", "vol_10", "vol_15"}, f"{name}: timeseries {list(ts or [])}"
+        for k, want in (("vol_5", "VolControl_5"), ("vol_10", "VolControl_10"),
+                        ("vol_15", "VolControl_15")):
+            assert ts[k]["selected"] == want, f"{name}.{k}: selected={ts[k]['selected']}"
+            for f in ("wealth", "drawdown", "exposure"):
+                assert ts[k]["series"][want][f], f"{name}.{k}.{want}.{f} leer"
+    n = len(_rec("S1")["rf_series"]["dates"])
+    print(f"ok  Archiv-Erweiterung vorhanden: rf_series ({n} Tage) und "
+          f"timeseries für drei Zielvolatilitäten in allen geprüften Records")
+
+
 def test_every_file_carries_its_run_hash():
     """The hash in the filename must be the hash of the record the exhibit came from —
     that link is what makes the appendix defensible."""
@@ -186,13 +234,32 @@ def test_every_file_carries_its_run_hash():
           f"{len(figs)} Abbildungen in PDF+SVG+PNG")
 
 
-def test_gaps_are_declared_not_silent():
-    """An exhibit the archive cannot supply must appear in the register as a gap."""
+def test_register_matches_declared_gaps():
+    """The register must mirror the generator's own gap list exactly.
+
+    Both directions matter: a gap the generator knows about but the register omits
+    would be an exhibit that silently disappears from the thesis, and a FEHLT row for
+    something that was in fact generated would send the reader looking for nothing.
+    """
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+    import exhibits
     with open(os.path.join(EXHIBITS, "REGISTER.csv"), encoding="utf-8-sig") as f:
         rows = list(csv.DictReader(f, delimiter=";"))
-    gaps = [r["bezeichner"] for r in rows if r["typ"] == "FEHLT"]
-    assert gaps, "Keine Lücken vermerkt — dann müsste jedes geplante Exhibit existieren"
-    print(f"ok  {len(gaps)} Lücken ausgewiesen statt still übersprungen: {', '.join(gaps)}")
+    listed = {r["bezeichner"] for r in rows if r["typ"] == "FEHLT"}
+    declared = {g[0] for g in exhibits.GAPS}
+    assert listed == declared, f"Register {sorted(listed)} vs Generator {sorted(declared)}"
+    built = {r["bezeichner"] for r in rows if r["typ"] != "FEHLT"}
+    assert not (built & listed), f"Als FEHLT gelistet und trotzdem erzeugt: {built & listed}"
+    # Every builder must appear in the register — a builder that runs but registers
+    # nothing produces an untraceable file.
+    names = {b.__name__ for b in exhibits.BUILDERS}
+    assert names <= built, f"Erzeugt, aber nicht registriert: {sorted(names - built)}"
+    if listed:
+        print(f"ok  {len(listed)} Lücken ausgewiesen statt still übersprungen: "
+              f"{', '.join(sorted(listed))}")
+    else:
+        print(f"ok  keine offenen Lücken; alle {len(built)} Exhibits erzeugt, "
+              f"registriert und auf Builder rückführbar")
 
 
 if __name__ == "__main__":
@@ -201,5 +268,7 @@ if __name__ == "__main__":
     test_tab_4_4_matches_hypotheses()
     test_tab_4_7_matches_three_records()
     test_tab_4_9_rf_pair()
+    test_tab_4_2_matches_crypto_share_records()
+    test_timeseries_and_rf_blocks_present()
     test_every_file_carries_its_run_hash()
-    test_gaps_are_declared_not_silent()
+    test_register_matches_declared_gaps()

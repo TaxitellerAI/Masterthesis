@@ -44,6 +44,11 @@ RECORDS: list[tuple[str, dict]] = (
      ("S3", {"scenario": "S3"})]
     + [(f"S4_{y}", {"scenario": f"S4_{y}"}) for y in (2018, 2019, 2020, 2021, 2022)]
     + [("S1_rf3", {"scenario": "S1", "rf_mode": "constant", "rf_annual": 0.03})]
+    # Teilfrage 1 asks what crypto does to a STATIC buy-and-hold portfolio. The sweep
+    # answers it only gross and with four fields; these records answer it with the
+    # full net metric set, from the same code path as the main table.
+    + [(f"S1_bh{int(s * 100)}", {"scenario": "S1", "crypto_share": s})
+       for s in (0.0, 0.25, 0.50)]
 )
 
 
@@ -88,7 +93,7 @@ def compute(name: str, overrides: dict) -> dict:
     mode and the fingerprint are actually assembled.
     """
     from api.main import (RunRequest, backtest, hypotheses, sweep, analytics,
-                          robustness, describe)
+                          robustness, describe, timeseries, _prepared)
     t0 = time.time()
     req = RunRequest(**overrides)
     bt = backtest(req)
@@ -101,6 +106,16 @@ def compute(name: str, overrides: dict) -> dict:
         "analytics": analytics(req),
         "robustness": robustness(req),
         "describe": describe(req),
+        # /timeseries returns paths for the SELECTED target vol only, so the three
+        # reported variants need three calls — otherwise a wealth chart could only
+        # ever show one of them.
+        "timeseries": {f"vol_{int(tv * 100)}": timeseries(
+            req.model_copy(update={"target_vol": tv}) if hasattr(req, "model_copy")
+            else RunRequest(**{**overrides, "target_vol": tv}))
+            for tv in (0.05, 0.10, 0.15)},
+        # The rf summary in describe() carries statistics, not the path. The path is
+        # what an appendix chart of the chained series needs.
+        "rf_series": _rf_series(req),
     }
     fp = bt.get("fingerprint", {})
     rec["hashes"] = {"dataset_hash": fp.get("dataset_hash"),
@@ -110,6 +125,30 @@ def compute(name: str, overrides: dict) -> dict:
     rec["environment"] = _versions()
     rec["git"] = _git()
     return rec
+
+
+def _rf_series(req) -> dict:
+    """Daily risk-free rate actually applied, on the sample calendar."""
+    from api.main import _prepared
+    rets, cfg, _rf_info, _spec, _rep, _pit = _prepared(req)
+    import numpy as np
+    import pandas as pd
+    raw = cfg.rf_for(rets.index)
+    # rf_for returns a Series, an array or a scalar depending on the mode — the
+    # constant mode is exactly the case the appendix chart has to show too.
+    if isinstance(raw, pd.Series):
+        ser = raw.reindex(rets.index)
+    else:
+        arr = np.asarray(raw, dtype=float)
+        if arr.ndim == 0:
+            arr = np.full(len(rets), float(arr))
+        ser = pd.Series(arr, index=rets.index)
+    td = cfg.trading_days
+    return {"dates": [str(d.date()) for d in ser.index],
+            "daily": [round(float(v), 12) for v in ser.to_numpy()],
+            "annualised": [round(float(v) * td, 12) for v in ser.to_numpy()],
+            "convention": f"Tagessatz x {td} Handelstage",
+            "mode": req.rf_mode}
 
 
 def _json_default(o):

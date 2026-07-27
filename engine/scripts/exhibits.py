@@ -139,6 +139,23 @@ def figure(ident: str, chapter: str, placement: str, scenario: str, source: str,
                      "titel": title})
 
 
+def _year_ticks(ax, dates: list[str]) -> None:
+    """Tick at the first observation of each year.
+
+    Even spacing by index lands on arbitrary months because the archived paths are
+    weekly-sampled — a print figure labelled 2019-01, 2019-12, 2020-12 looks like an
+    error even when the data is right.
+    """
+    idx, labels, seen = [], [], set()
+    for i, d in enumerate(dates):
+        y = d[:4]
+        if y not in seen:
+            seen.add(y)
+            idx.append(i)
+            labels.append(y)
+    ax.set_xticks(idx, labels)
+
+
 LABELS = {"BuyHold": "Buy-and-Hold", "VolControl_5": "Vol-Control 5 %",
           "VolControl_10": "Vol-Control 10 %", "VolControl_15": "Vol-Control 15 %",
           "Benchmark_TrueBH": "True Buy-and-Hold (Drift)", "Benchmark_6040": "60/40",
@@ -580,9 +597,7 @@ def abb_4_9():
     ax.plot(range(len(r["dates"])), r["bh_sharpe"], color=GREY, lw=1.2, ls="--",
             label="Buy-and-Hold")
     ax.axhline(0, color="black", lw=0.8)
-    step = max(1, len(r["dates"]) // 8)
-    ax.set_xticks(range(0, len(r["dates"]), step),
-                  [r["dates"][i][:7] for i in range(0, len(r["dates"]), step)], rotation=45)
+    _year_ticks(ax, r["dates"])
     ax.set_ylabel("Rollierende Sharpe Ratio")
     ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _p: de(v, 1)))
     ax.set_title(f"Rollierende Sharpe Ratio ({dei(r['window'])} Handelstage)")
@@ -622,9 +637,7 @@ def abb_4_11():
             label="Vol-Control (Out-of-Sample)")
     ax.plot(range(len(wf["dates"])), wf["bh_wealth"], color=GREY, lw=1.4, ls="--",
             label="Buy-and-Hold (Out-of-Sample)")
-    step = max(1, len(wf["dates"]) // 8)
-    ax.set_xticks(range(0, len(wf["dates"]), step),
-                  [wf["dates"][i][:7] for i in range(0, len(wf["dates"]), step)], rotation=45)
+    _year_ticks(ax, wf["dates"])
     ax.set_ylabel("Vermögensindex (Start = 1)")
     ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _p: de(v, 2)))
     ax.set_title("Walk-Forward: Vermögensverlauf out-of-sample")
@@ -689,42 +702,141 @@ def tab_a_1():
           "sind auf 1e-12 quantisiert und damit plattformunabhängig.")
 
 
-BUILDERS = [tab_3_1, tab_3_2, tab_3_3, abb_3_1, tab_3_4,
-            tab_4_1, tab_4_3, tab_4_4, tab_4_5, tab_4_6, tab_4_7, tab_4_8, tab_4_9,
+
+def tab_4_2():
+    """Teilfrage 1 — what crypto does to a STATIC portfolio, before any vol control."""
+    shares = [("S1_bh0", 0.0), ("S1_bh10", 0.10), ("S1_bh25", 0.25), ("S1_bh50", 0.50)]
+    rows = []
+    for name, sh in shares:
+        r = rec("S1" if name == "S1_bh10" else name)
+        m = next(x for x in r["backtest"]["metrics"] if x["strategy"] == "BuyHold")
+        assert abs(r["backtest"]["crypto_share"] - sh) < 1e-9, (
+            f"{name}: Record traegt Quote {r['backtest']['crypto_share']}, erwartet {sh}")
+        rows.append([de(sh, 0, True), de(m["ann_return"], 2, True), de(m["cagr"], 2, True),
+                     de(m["ann_vol"], 2, True), de(m["sharpe"], 3),
+                     de(m["max_drawdown"], 2, True), de(m["cvar_95"], 2, True),
+                     de(m["turnover"], 2)])
+    table("tab_4_2", "4", "Hauptteil", "S1_bh0/S1/S1_bh25/S1_bh50",
+          "backtest.metrics[BuyHold]",
+          "Teilfrage 1: Risiko-Rendite-Profil des STATISCHEN Portfolios je Krypto-Quote",
+          ["Krypto-Quote", "Rendite p.a.", "CAGR", "Vol p.a.", "Sharpe",
+           "Max. Drawdown", "CVaR 95 %", "Turnover"], rows,
+          "OHNE Volatilitätssteuerung — das monatlich rebalancierte Buy-and-Hold-"
+          "Portfolio bei verschiedenen Krypto-Anteilen. Netto nach Transaktionskosten "
+          "und damit direkt vergleichbar mit tab_4_1. Genau diese Zeilen beantworten "
+          "Teilfrage 1; die Vol-Control-Ergebnisse ab tab_4_4 setzen darauf auf. "
+          "Der traditionelle Teil bleibt intern im Verhältnis 60/30/10 aufgeteilt.")
+
+
+def abb_3_2():
+    rf = rec("S1")["rf_series"]
+    fig, ax = plt.subplots()
+    ax.plot(range(len(rf["dates"])), [v * 100 for v in rf["annualised"]],
+            color=ACCENT, lw=1.2)
+    ax.axhline(0, color=NEG, lw=1.0, ls="--")
+    splice = rec("S1")["describe"]["rf"]["estr"]["splice_date"]
+    if splice in rf["dates"]:
+        i = rf["dates"].index(splice)
+        ax.axvline(i, color="black", lw=1.0, ls=":")
+        ax.annotate(f"Umstellung auf €STR\n{splice}", xy=(i, 0), xytext=(i + 40, -0.35),
+                    fontsize=8, arrowprops=dict(arrowstyle="->", lw=0.8))
+    _year_ticks(ax, rf["dates"])
+    ax.set_ylabel("Risikofreier Zins p.a.")
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _p: de(v, 1) + " %"))
+    ax.set_title("Verketteter risikofreier Zins im Stichprobenfenster")
+    e = rec("S1")["describe"]["rf"]["estr"]
+    figure("abb_3_2", "3", "Hauptteil", "S1", "rf_series",
+           "Verlauf des verketteten risikofreien Zinses", fig,
+           f"€STR ab {splice}, davor EONIA abzüglich {de(e['spread_bps'], 1)} "
+           "Basispunkten (offizieller EZB-Umstellungsspread). Im Stichprobenfenster war "
+           f"der Zins an {de(e['window_share_negative'], 1, True)} der Tage negativ, "
+           f"im Mittel {de(e['window_mean_annual'], 2, True)} p.a. Er verzinst "
+           "ausschließlich die nicht investierte Quote der Vol-Control — gerade in den "
+           "Stressphasen, in denen diese Quote am größten ist.")
+
+
+def _ts_plot(ident, placement, field, ylabel, title, caption, pct=False, hline=None):
+    ts = rec("S1")["timeseries"]
+    dates = ts["vol_10"]["dates"]
+    fig, ax = plt.subplots()
+    order = [("vol_5", "VolControl_5", "Vol-Control 5 %", ACCENT, ":", 1.2),
+             ("vol_10", "VolControl_10", "Vol-Control 10 %", ACCENT, "-", 1.8),
+             ("vol_15", "VolControl_15", "Vol-Control 15 %", ACCENT, "-.", 1.2)]
+    for key, _strat, label, col, ls, lw in order:
+        block = ts[key]["series"]
+        name = ts[key]["selected"]
+        y = block[name][field]
+        ax.plot(range(len(y)), [v * 100 for v in y] if pct else y,
+                color=col, ls=ls, lw=lw, label=label)
+    if field != "exposure":
+        for strat, label, col, ls in (("BuyHold", "Buy-and-Hold", GREY, "--"),
+                                      ("Benchmark_TrueBH", "True Buy-and-Hold", NEG, ":")):
+            y = ts["vol_10"]["series"].get(strat, {}).get(field)
+            if y:
+                ax.plot(range(len(y)), [v * 100 for v in y] if pct else y,
+                        color=col, ls=ls, lw=1.3, label=label)
+    if hline is not None:
+        ax.axhline(hline, color="black", lw=0.9)
+    _year_ticks(ax, dates)
+    ax.set_ylabel(ylabel)
+    ax.yaxis.set_major_formatter(FuncFormatter(
+        lambda v, _p: de(v, 0) + " %" if pct else de(v, 1)))
+    ax.set_title(title)
+    ax.legend(frameon=False, fontsize=8)
+    figure(ident, "4", placement, "S1", "timeseries", title, fig, caption)
+
+
+def abb_4_1():
+    _ts_plot("abb_4_1", "Hauptteil", "wealth", "Vermögensindex (Start = 1)",
+             "Vermögensverlauf der Strategien",
+             "Aus 1 Euro zu Beginn des Stichprobenfensters, netto nach "
+             "Transaktionskosten. True Buy-and-Hold driftet ohne Rebalancing und "
+             "erreicht das höchste Endvermögen bei zugleich tiefstem Drawdown "
+             "(tab_4_1) — Rendite und Risiko sind hier nicht zu trennen.")
+
+
+def abb_4_2():
+    ts = rec("S1")["timeseries"]
+    dates = ts["vol_10"]["dates"]
+    fig, ax = plt.subplots()
+    for key, label, ls, lw in (("vol_5", "Vol-Control 5 %", ":", 1.2),
+                               ("vol_10", "Vol-Control 10 %", "-", 1.8),
+                               ("vol_15", "Vol-Control 15 %", "-.", 1.2)):
+        name = ts[key]["selected"]
+        y = ts[key]["series"][name]["exposure"]
+        ax.plot(range(len(y)), [v * 100 for v in y], color=ACCENT, ls=ls, lw=lw, label=label)
+    ax.axhline(100, color=NEG, lw=1.2, ls="--", label="Hebelgrenze 100 %")
+    _year_ticks(ax, dates)
+    ax.set_ylabel("Investitionsquote")
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _p: de(v, 0) + " %"))
+    ax.set_title("Investitionsquote der Vol-Control im Zeitverlauf")
+    ax.legend(frameon=False, fontsize=8)
+    figure("abb_4_2", "4", "Anhang", "S1", "timeseries",
+           "Investitionsquote der Vol-Control im Zeitverlauf", fig,
+           "Die Quote ist auf 100 % gedeckelt — es wird nicht gehebelt. Bei Zielvol "
+           "15 % liegt sie an 58,1 % der Handelstage an dieser Grenze, bei 5 % an "
+           "keinem einzigen. Das erklärt den nicht-monotonen Turnover in tab_4_3: "
+           "eine Quote am Anschlag bewegt sich nicht mehr.")
+
+
+def abb_4_6():
+    _ts_plot("abb_4_6", "Anhang", "drawdown", "Drawdown",
+             "Drawdown-Verläufe im Vergleich",
+             "Rückgang vom jeweils vorangegangenen Höchststand. Die Vol-Control "
+             "begrenzt vor allem die TIEFE der Einbrüche — das ist der Mechanismus "
+             "hinter H1 (tab_4_4). Die tiefsten Einzelepisoden stehen in tab_4_12.",
+             pct=True, hline=0)
+
+
+BUILDERS = [tab_3_1, tab_3_2, tab_3_3, abb_3_1, abb_3_2, tab_3_4,
+            tab_4_1, tab_4_2, tab_4_3, tab_4_4, tab_4_5, tab_4_6, tab_4_7, tab_4_8, tab_4_9,
             tab_4_10, tab_4_11, tab_4_12, abb_4_3, abb_4_4, abb_4_5, abb_4_7, abb_4_8,
-            abb_4_9, abb_4_10, abb_4_11, abb_4_12,
+            abb_4_1, abb_4_2, abb_4_6, abb_4_9, abb_4_10, abb_4_11, abb_4_12,
             tab_a_1]
 
 # Exhibits the archive cannot supply. Listed explicitly rather than silently skipped —
 # a missing exhibit that nobody notices is worse than one that announces itself.
-GAPS = [
-    ("tab_4_2", "4", "Hauptteil",
-     "Teilfrage 1: Buy-and-Hold bei Krypto-Quote 0/10/25/50 %, netto",
-     "Das Archiv hält backtest.metrics nur für die angefragte Quote (10 %). "
-     "sweep.points führt zwar alle 21 Quoten, aber BRUTTO und nur mit "
-     "d_mdd/d_cvar/sharpe_bh/sharpe_vc — ohne Rendite, CAGR, Vol, MaxDD, CVaR.",
-     "RECORDS in freeze_run.py um S1_bh0/S1_bh25/S1_bh50 ergänzen "
-     "(crypto_share 0.0/0.25/0.50) und das Archiv neu erzeugen."),
-    ("abb_3_2", "3", "Hauptteil", "Verlauf der verketteten €STR/EONIA-Tagesreihe",
-     "describe.rf.estr enthält nur Kennzahlen der Reihe (Mittel, Min, Max, Anteil "
-     "negativer Tage), nicht die Tageswerte selbst.",
-     "rf-Tagesreihe im Record ablegen — sie liegt in der Engine bereits vor "
-     "(cfg.rf_for). Ersatzweise deckt tab_3_4 die Kennzahlen ab."),
-    ("abb_4_1", "4", "Hauptteil",
-     "Vermögensverlauf VC 5/10/15 gegen Buy-and-Hold und True Buy-and-Hold",
-     "Der /timeseries-Endpoint wurde beim Archivieren nicht aufgerufen; im Record "
-     "liegt nur der Out-of-Sample-Verlauf aus dem Walk-Forward (robustness."
-     "walk_forward.oos), der als abb_4_11 erzeugt wurde.",
-     "'timeseries' in die compute()-Blockliste von freeze_run.py aufnehmen und das "
-     "Archiv neu erzeugen."),
-    ("abb_4_2", "4", "Anhang", "Exposure-Pfad der Vol-Control 10 % mit Hebelgrenze",
-     "Gleiche Ursache: der Exposure-Pfad kommt aus /timeseries.",
-     "wie abb_4_1."),
-    ("abb_4_6", "4", "Anhang", "Drawdown-Verläufe VC 10 % gegen Buy-and-Hold",
-     "Gleiche Ursache. analytics.drawdowns führt nur die fünf tiefsten Episoden als "
-     "Liste — daraus wurde tab_4_12 erzeugt, nicht aber der Verlauf.",
-     "wie abb_4_1."),
-]
+GAPS: list[tuple] = []   # alle urspruenglichen Luecken sind mit der additiven Archiv-Erweiterung aufgeloest
 
 
 def write_register() -> None:

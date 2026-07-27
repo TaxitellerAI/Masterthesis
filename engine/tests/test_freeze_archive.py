@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 ARCHIVE = os.path.join(os.path.dirname(__file__), "..", "results", "freeze")
 
 RECORDS = ["S1", "S2", "S3", "S4_2018", "S4_2019", "S4_2020",
-           "S4_2021", "S4_2022", "S1_rf3"]
+           "S4_2021", "S4_2022", "S1_rf3", "S1_bh0", "S1_bh25", "S1_bh50"]
 
 # The S1 figures the written thesis cites. Pinned literally: if the engine ever moves
 # one of them, that has to be a deliberate decision with a new run and a change note,
@@ -60,6 +60,40 @@ def test_archive_is_complete():
             assert env.get(k), f"{name}: Version '{k}' fehlt"
         assert r["git"].get("commit"), f"{name}: Git-Commit fehlt"
     print(f"ok  {len(RECORDS)} Records vollständig (Bloecke, Hashes, Umgebung, Commit)")
+
+
+def test_additive_blocks_present_in_every_record():
+    """timeseries and rf_series were added AFTER the freeze. They must be in every
+    record, or an exhibit built from them would silently cover only some scenarios."""
+    for name in RECORDS:
+        r = _load(name)
+        assert set(r.get("timeseries", {})) == {"vol_5", "vol_10", "vol_15"}, (
+            f"{name}: timeseries unvollständig")
+        rf = r.get("rf_series", {})
+        assert rf.get("dates") and len(rf["dates"]) == len(rf["daily"]), (
+            f"{name}: rf_series fehlt oder inkonsistent")
+        assert len(rf["dates"]) == r["backtest"]["sample"]["n_return_days"], (
+            f"{name}: rf-Reihe {len(rf['dates'])} Tage, Sample "
+            f"{r['backtest']['sample']['n_return_days']}")
+    print(f"ok  timeseries (3 Zielvols) und rf_series in allen {len(RECORDS)} Records")
+
+
+def test_crypto_share_records_differ():
+    """S1_bh0/25/50 exist to answer Teilfrage 1. They share S1's run hash because the
+    fingerprint does not cover crypto_share — so the VALUES have to prove they are
+    different runs, since the hash cannot."""
+    shares = {"S1_bh0": 0.0, "S1": 0.10, "S1_bh25": 0.25, "S1_bh50": 0.50}
+    seen = {}
+    for name, want in shares.items():
+        r = _load(name)
+        assert abs(r["backtest"]["crypto_share"] - want) < 1e-9, (
+            f"{name}: Quote {r['backtest']['crypto_share']}, erwartet {want}")
+        bh = next(m for m in r["backtest"]["metrics"] if m["strategy"] == "BuyHold")
+        seen[name] = bh["ann_return"]
+    assert len(set(seen.values())) == 4, f"Nicht vier verschiedene Portfolios: {seen}"
+    assert seen["S1_bh0"] < seen["S1"] < seen["S1_bh25"] < seen["S1_bh50"], seen
+    print("ok  vier Krypto-Quoten liefern vier verschiedene Portfolios "
+          + " < ".join(f"{v:.4f}" for v in seen.values()))
 
 
 def test_archive_was_built_from_a_clean_tree():
@@ -133,6 +167,8 @@ def test_rf_sensitivity_pair_is_comparable():
 
 if __name__ == "__main__":
     test_archive_is_complete()
+    test_additive_blocks_present_in_every_record()
+    test_crypto_share_records_differ()
     test_archive_was_built_from_a_clean_tree()
     test_s1_reference_values_unchanged()
     test_rf_sensitivity_pair_is_comparable()
