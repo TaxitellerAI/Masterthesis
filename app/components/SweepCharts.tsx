@@ -59,6 +59,15 @@ function ChartFrame({
   );
 }
 
+// The sweep runs on backtest.crypto_sweep, which does NOT subtract the weight-
+// rebalancing cost — unlike the metrics table. At the default 10 % crypto share the
+// same quantity therefore reads 0.9276 here and 0.9040 there. Both are correct; only
+// an unlabelled "Sharpe" on both would be wrong, so the charts say which one this is.
+const BRUTTO_HINWEIS =
+  "Sharpe der statischen und der volatilitätsgesteuerten Variante je Krypto-Anteil, " +
+  "BRUTTO — ohne die Kosten der Gewichtsumschichtung. Die Kennzahlentabelle weist " +
+  "netto aus; die Differenz steht dort in der Spalte Turnover bzw. im Tooltip. ";
+
 export default function SweepCharts({ data, loading, boot = null }: Props) {
   const pts = data?.points ?? [];
 
@@ -113,16 +122,18 @@ export default function SweepCharts({ data, loading, boot = null }: Props) {
       {data && (
         <div className="grid md:grid-cols-2 gap-5">
           <ChartFrame
-            title="Risiko-Effekt der Vol-Control über die Krypto-Quote"
+            title="Risiko-Effekt der Vol-Control über die Krypto-Quote (brutto)"
             caption={
               deltaBands.length
-                ? "ΔMDD und ΔCVaR = Vol-Control minus Buy-and-Hold. Positiv = mildere Verlustkennzahl. " +
+                ? "ΔMDD und ΔCVaR = Vol-Control minus Buy-and-Hold, BRUTTO (ohne Kosten der " +
+                  "Gewichtsumschichtung). Positiv = mildere Verlustkennzahl. " +
                   `Flächen = Bootstrap-Konfidenz für ΔMDD (B = ${boot!.n_boot.toLocaleString("de-DE")}): ` +
                   "dunkler = punktweise 95 %, heller = SIMULTAN über alle Quoten " +
                   `(Faktor ${boot!.bands.d_mdd.simultaneous_factor.toFixed(2)} statt 1,96). ` +
                   "Das simultane Band enthält bei niedrigen Quoten die Null, das punktweise nicht — " +
                   "die Gesamtunsicherheit über die Kurve ist deutlich größer als je Einzelpunkt."
-                : "ΔMDD und ΔCVaR = Vol-Control minus Buy-and-Hold. Positiv = mildere Verlustkennzahl."
+                : "ΔMDD und ΔCVaR = Vol-Control minus Buy-and-Hold, BRUTTO (ohne Kosten der " +
+                  "Gewichtsumschichtung). Positiv = mildere Verlustkennzahl."
             }
             legend={[
               { label: "ΔMDD", color: ACCENT },
@@ -133,14 +144,14 @@ export default function SweepCharts({ data, loading, boot = null }: Props) {
           </ChartFrame>
 
           <ChartFrame
-            title="Sharpe-Verläufe über die Krypto-Quote"
+            title="Sharpe-Verläufe über die Krypto-Quote (brutto)"
             caption={
               sharpeBands.length
-                ? "Sharpe der statischen und der volatilitätsgesteuerten Variante je Krypto-Anteil. " +
+                ? BRUTTO_HINWEIS +
                   "Die Flächen sind das Bootstrap-Konfidenzband der VOL-CONTROL-Sharpe " +
                   "(dunkler = punktweise 95 %, heller = simultan über alle Quoten) — deshalb " +
                   "reicht die Achse deutlich über die Punktschätzungen hinaus."
-                : "Sharpe der statischen und der volatilitätsgesteuerten Variante je Krypto-Anteil."
+                : BRUTTO_HINWEIS
             }
             legend={[
               { label: "Vol-Control", color: ACCENT },

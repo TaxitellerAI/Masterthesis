@@ -36,21 +36,36 @@ Documented simplifications (they matter for the write-up)
     rebalances monthly and net. Slope on the primary spec: 0.753635 against 0.709898
     here (S1). This deviation is deliberate — see below.
 
+    Three slopes exist for S1 and must never be conflated; each is named by its
+    producer, not by an adjective:
+      0.709898  sweep_bootstrap (this module) — daily, GROSS, scalar rf. The
+                CONFIRMATORY H3 estimator; the reported CI belongs to this one.
+      0.738954  backtest.crypto_sweep — monthly, GROSS, rf series. A display sweep,
+                not an inference input.
+      0.753635  "Punktschätzung der Hauptspezifikation" — monthly, NET, rf series,
+                via the full run_strategies path, i.e. the same code that produces
+                the reported metrics table. Supplementary; it has no CI of its own.
+
 Why not a position-based rebalancing grid
 -----------------------------------------
 The obvious repair is to replace the calendar month by "every 21 observations",
 which IS well-defined on a resampled path and matches the calendar frequency
 (S1: 95 calendar rebalancings, mean spacing 20.94 rows). It was measured and
 REJECTED. Same frequency, same net costs, same rf convention, only the grid
-differs — and the slope lands at 0.703713 instead of the calendar 0.742462.
+differs — and the slope lands at 0.714957 instead of the calendar 0.753635.
 Worse, the result depends on the PHASE of the grid: sweeping the offset over all
-21 possible starting rows moves the slope from 0.578070 to 0.817021 — a spread of
-0.238951, which is 41 % of the width of the reported bootstrap CI, and far larger
+21 possible starting rows moves the slope from 0.588093 to 0.826667 — a spread of
+0.238574, which is 41 % of the width of the reported bootstrap CI, and far larger
 than the daily-vs-monthly gap the grid was meant to close. With only ~95 rebalancing
 events over 2010 rows, WHICH rows carry them dominates; the frequency does not pin
 the estimate down. Picking one offset would introduce a researcher degree of freedom
 of the same order as the effect under test. Averaging over phases would be a
 different estimator again.
+
+These figures are reproduced by tests/test_rebalance_grid.py, which first proves its
+positional mix IS strategies.periodic_mix (bit-exact on calendar keys) before varying
+the grid — an earlier hand-rolled reproduction reset at the end of a block instead of
+into the boundary day and drifted by ~1.1e-03 per day, enough to shift a slope by 0.011.
 
 So the deviation stays and is labelled instead: the estimator is internally
 consistent (point estimate and all replicates use the identical rule), and the

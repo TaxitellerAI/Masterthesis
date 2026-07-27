@@ -240,14 +240,18 @@ export default function HypothesesPanel({
                       Gewichtsumschichtungskosten). Die Punktschätzung und alle Replikate
                       verwenden denselben Schätzer; der Wert ist deshalb in sich konsistent,
                       aber nicht deckungsgleich mit der Steigung des primären, monatlich
-                      rebalancierten Netto-Backtests: dort beträgt die Punktschätzung{" "}
-                      <strong>0,754</strong> — und liegt damit klar innerhalb des hier
-                      berichteten Konfidenzintervalls. Ein positionsbasiertes Raster
-                      (Rebalancing alle 21 Beobachtungen) wurde geprüft und verworfen: bei
-                      gleicher Frequenz hängt die Steigung stark davon ab, an welcher Stelle
-                      das Raster ansetzt (0,578 bis 0,817 über die 21 möglichen Phasen,
-                      41 % der KI-Breite). Das wäre ein willkürlicher Forscherfreiheitsgrad
-                      in der Größenordnung des gemessenen Effekts.
+                      rebalancierten Netto-Backtests. Diese <em>Punktschätzung der
+                      Hauptspezifikation</em> — dieselbe Rechenstrecke wie die
+                      Kennzahlentabelle — beträgt <strong>0,753635</strong> und liegt klar
+                      innerhalb des hier berichteten Konfidenzintervalls. Sie ist eine
+                      ergänzend berichtete Größe und trägt kein eigenes Konfidenzintervall;
+                      die konfirmatorische H3-Steigung ist und bleibt der oben ausgewiesene
+                      Bootstrap-Schätzer. Ein positionsbasiertes Raster (Rebalancing alle
+                      21 Beobachtungen) wurde geprüft und verworfen: bei gleicher Frequenz
+                      hängt die Steigung stark davon ab, an welcher Stelle das Raster
+                      ansetzt (0,589 bis 0,827 über die 21 möglichen Phasen, 41 % der
+                      KI-Breite). Das wäre ein willkürlicher Forscherfreiheitsgrad in der
+                      Größenordnung des gemessenen Effekts.
                     </div>
                   </div>
                 )}
