@@ -114,7 +114,11 @@ def test_rf_sensitivity_pair_is_comparable():
         "Gleicher Lauf-Hash trotz anderem Zinsmodus — der Fingerprint erfasst rf nicht")
     ra, rb = a["request"], b["request"]
     diff = {k for k in set(ra) | set(rb) if ra.get(k) != rb.get(k)}
-    assert diff == {"rf_mode", "rf_annual"}, f"Zusätzliche Unterschiede: {diff - {'rf_mode', 'rf_annual'}}"
+    # rf_annual is already 0.03 by default, so only the MODE actually flips — the
+    # requirement is that nothing beyond the rf knobs differs, not that both differ.
+    extra = diff - {"rf_mode", "rf_annual"}
+    assert not extra, f"Zusätzliche Unterschiede neben dem Zins: {extra}"
+    assert "rf_mode" in diff, "rf_mode identisch — die beiden Records sind derselbe Lauf"
     # The return series of a fully invested benchmark cannot depend on rf.
     A = {m["strategy"]: m for m in a["backtest"]["metrics"]}
     B = {m["strategy"]: m for m in b["backtest"]["metrics"]}
