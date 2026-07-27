@@ -1,7 +1,7 @@
 # Ergebnis-Freeze — Archivübersicht
 
-Erzeugt: 2026-07-27T17:43:14+00:00  
-Commit: `4297973-dirty` (42979733079e421c6344076350fc9c1edfea3794)  **ACHTUNG: Arbeitsbaum war nicht sauber**
+Erzeugt: 2026-07-27T17:46:18+00:00  
+Commit: `f1b310a` (f1b310abaf8cf0ac4618398edca00e8ee86767f9)
 Umgebung: Python 3.14.4 · numpy 2.5.0 · pandas 3.0.3 · scipy 1.18.0 · statsmodels 0.14.6 · Darwin 25.6.0 arm64
 
 | Record | Fenster | n | Datensatz-Hash | Lauf-Hash | Laufzeit |
@@ -10,7 +10,7 @@ Umgebung: Python 3.14.4 · numpy 2.5.0 · pandas 3.0.3 · scipy 1.18.0 · statsm
 | S2 | 2015-01-02–2025-12-31 | 2765 | `ebf5ba110371d633` | `f3e55eb08c91c93b` | 0.5s |
 | S3 | 2021-01-04–2025-12-31 | 1254 | `f10f75b3cc68093b` | `6cb43825ee6860a3` | 0.4s |
 | S4_2018 | 2018-01-02–2025-12-31 | 2010 | `715caf81d0dd19d5` | `eade5ce249da9ebb` | 8.4s |
-| S4_2019 | 2019-01-02–2025-12-31 | 1759 | `393b9fff8c45e318` | `4b3c9e6e5d94c226` | 7.0s |
+| S4_2019 | 2019-01-02–2025-12-31 | 1759 | `393b9fff8c45e318` | `4b3c9e6e5d94c226` | 7.1s |
 | S4_2020 | 2020-01-02–2025-12-31 | 1507 | `4aaa25e937fa7322` | `9ee0b737af2a6365` | 6.1s |
 | S4_2021 | 2021-01-04–2025-12-31 | 1254 | `43c7318e1fb4c7a6` | `92be61991a3fa7c1` | 5.1s |
 | S4_2022 | 2022-01-03–2025-12-31 | 1002 | `282cd7a47293c575` | `a3838800c6c7407e` | 4.2s |
@@ -46,4 +46,9 @@ Verkettete €STR/EONIA-Tagesreihe gegen konstante 3 % p. a.
 
 H1 ΔMDD: +0.084662 gegen +0.085257; H2 ΔSharpe: +0.075343 gegen +0.071850.
 
-Der Zins trifft ausschließlich die Cash-Quote der Vol-Control; Buy-and-Hold ist voll investiert und daher unberührt. Die Differenz ist damit die Größe, um die eine konstante Zinsannahme die Strategie besser aussehen ließe, als sie war.
+
+Der Zins wirkt an ZWEI Stellen, die nicht verwechselt werden dürfen. In der RENDITEREIHE nur bei der Vol-Control, über die Cash-Quote (1 − Exposure) · rf: die Buy-and-Hold-Reihe ist dort tatsächlich unberührt (Rendite p. a. 0,159200 in beiden Läufen, MaxDD −0,271400 in beiden). Im SHARPE dagegen bei allen Strategien, weil rf der Vergleichszins im Zähler ist — deshalb fällt auch der Buy-and-Hold-Sharpe um 0,1270.
+
+Die Sharpe-Änderung folgt eng −ē · Δrf / σ (ē = mittleres Exposure): vorhergesagt −0,1281 / −0,1455 / −0,1450 / −0,1382 für BH und VC 5/10/15, gemessen −0,1270 / −0,1325 / −0,1307 / −0,1289. Die Vol-Control verliert je Einheit mehr, weil ihre kleinere Volatilität im Nenner steht.
+
+Für die berichteten VERGLEICHE ist der Effekt daher klein: der Sharpe-Vorsprung der Vol-Control gegenüber Buy-and-Hold geht von +0,0755 auf +0,0718 zurück (−0,0037), der Drawdown-Vorsprung steigt leicht von +0,0847 auf +0,0852. Die naheliegende Vermutung, eine konstante positive Zinsannahme schmeichle der Vol-Control, bestätigt sich in dieser Stichprobe NICHT — sie verschiebt vor allem das NIVEAU aller Sharpe-Werte um rund 0,13, nicht die Rangfolge. Wer Niveaus zitiert, muss die Zinskonvention mitnennen; die Hypothesentests H1 und H2 sind gegenüber dieser Annahme nahezu invariant.

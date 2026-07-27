@@ -59,6 +59,12 @@ def _versions() -> dict:
     }
 
 
+# Captured ONCE, before anything is written. Calling git per record would report
+# every record after the first as "dirty" — writing S1.json dirties the tree itself,
+# so the flag would describe the archive rather than the code that produced it.
+_GIT_AT_START: dict | None = None
+
+
 def _git() -> dict:
     def run(*a):
         try:
@@ -66,9 +72,12 @@ def _git() -> dict:
                                   cwd=os.path.dirname(__file__), timeout=15).stdout.strip()
         except Exception:
             return None
-    return {"commit": run("rev-parse", "HEAD"),
-            "describe": run("describe", "--tags", "--always", "--dirty"),
-            "dirty": bool(run("status", "--porcelain"))}
+    global _GIT_AT_START
+    if _GIT_AT_START is None:
+        _GIT_AT_START = {"commit": run("rev-parse", "HEAD"),
+                         "describe": run("describe", "--tags", "--always", "--dirty"),
+                         "dirty": bool(run("status", "--porcelain"))}
+    return dict(_GIT_AT_START)
 
 
 def compute(name: str, overrides: dict) -> dict:
@@ -122,6 +131,7 @@ def _stable(obj) -> str:
 
 
 def write_archive() -> list[dict]:
+    _git()                      # pin the pre-write state for every record
     os.makedirs(OUT_DIR, exist_ok=True)
     records = []
     for name, ov in RECORDS:
