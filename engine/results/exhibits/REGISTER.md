@@ -1,6 +1,6 @@
 # Exhibit-Register
 
-Erzeugt aus dem Freeze-Archiv (Tag `results-freeze-v1`). 31 Exhibits, 0 offene Lücken.
+Erzeugt aus dem Freeze-Archiv (Tag `results-freeze-v1`). 32 Exhibits, 0 offene Lücken.
 
 Die Spalte **Platzierung** ist ein Vorschlag und in REGISTER.csv leicht änderbar; sie beeinflusst die Erzeugung nicht.
 
@@ -16,6 +16,7 @@ Die Spalte **Platzierung** ist ein Vorschlag und in REGISTER.csv leicht änderba
 | `abb_4_10` | Abbildung | 4 | Anhang | S1 | `analytics.distribution` | `0800e49d75cee860` | Verteilung der Tagesrenditen mit CVaR-Markierung |
 | `abb_4_11` | Abbildung | 4 | Anhang | S1 | `robustness.walk_forward.oos` | `0800e49d75cee860` | Out-of-Sample-Vermögensverlauf aus dem Walk-Forward |
 | `abb_4_12` | Abbildung | 4 | Anhang | S1 | `analytics.monthly` | `0800e49d75cee860` | Monatsrenditen im Zeitraster |
+| `abb_4_13` | Abbildung | 4 | Hauptteil | S1 | `analytics.correlation` | `0800e49d75cee860` | Rollierende Korrelation der digitalen Assets zum Aktienindex |
 | `abb_4_2` | Abbildung | 4 | Anhang | S1 | `timeseries` | `0800e49d75cee860` | Investitionsquote der Vol-Control im Zeitverlauf |
 | `abb_4_3` | Abbildung | 4 | Hauptteil | S1 | `sweep.points + sweep_bootstrap.bands` | `0800e49d75cee860` | Risiko-Effekt über die Krypto-Quote mit Konfidenzbändern |
 | `abb_4_4` | Abbildung | 4 | Anhang | S1 | `sweep.points + sweep_bootstrap.bands` | `0800e49d75cee860` | Sharpe-Verläufe über die Krypto-Quote (brutto) |

@@ -840,10 +840,88 @@ def abb_4_6():
              pct=True, hline=0)
 
 
+def _corr_blocks():
+    """Block means of the rolling correlation, recomputed from the record.
+
+    Kept next to the figure so the caption's numbers and the drawn lines can never
+    drift apart — the caption is the part a reader quotes.
+    """
+    c = rec("S1")["analytics"]["correlation"]
+    d, S = c["dates"], c["series"]
+
+    def mean_of(lo, hi):
+        out = {}
+        for asset, v in S.items():
+            vals = [v[i] for i, x in enumerate(d) if lo <= x < hi and v[i] is not None]
+            out[asset] = sum(vals) / len(vals) if vals else None
+        return out
+
+    return {"vor": mean_of("2018-01-01", "2020-02-01"),
+            "covid": mean_of("2020-02-01", "2020-07-01"),
+            "ab2023": mean_of("2023-01-01", "2026-01-01")}
+
+
+def abb_4_13():
+    c = rec("S1")["analytics"]["correlation"]
+    d, S = c["dates"], c["series"]
+    styles = [("Bitcoin", ACCENT, "-", 1.8), ("Ethereum", "#4d7fa8", "--", 1.4),
+              ("XRP", GREY, "-.", 1.4), ("BNB", NEG, ":", 1.5)]
+    fig, ax = plt.subplots()
+    # The COVID window is SHADED rather than outlined: with four lines already in the
+    # frame, a boxed annotation competed with them for attention, while a flat tint
+    # sits behind everything and is read as background. Judged by eye on the rendered
+    # figure, not assumed.
+    lo = next(i for i, x in enumerate(d) if x >= "2020-02-01")
+    hi = next(i for i, x in enumerate(d) if x >= "2020-07-01")
+    ax.axvspan(lo, hi, color=NEG, alpha=0.08, zorder=0)
+    ax.annotate("Feb.–Juni 2020", xy=((lo + hi) / 2, 0.03),
+                xycoords=("data", "axes fraction"), ha="center", fontsize=8, color=NEG)
+    for asset, col, ls, lw in styles:
+        v = S[asset]
+        xs = [i for i, y in enumerate(v) if y is not None]
+        ax.plot(xs, [v[i] for i in xs], color=col, ls=ls, lw=lw, label=asset)
+    ax.axhline(0, color="black", lw=0.9)
+    _year_ticks(ax, d)
+    ax.set_ylabel("Korrelation zum Aktienindex")
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _p: de(v, 1)))
+    ax.set_title("Rollierende Korrelation der digitalen Assets zum Aktienindex")
+    # Placed OUTSIDE the axes: four volatile series leave no quadrant reliably free —
+    # lower centre sat on Bitcoin's 2019 trough, upper left on the 2020 peak.
+    ax.legend(frameon=False, ncols=4, loc="upper center", bbox_to_anchor=(0.5, -0.12),
+              fontsize=8)
+
+    b = _corr_blocks()
+    rng = lambda m: (min(m.values()), max(m.values()))
+    v_lo, v_hi = rng(b["vor"])
+    pre = [v[i] for _a, v in S.items() for i, x in enumerate(d)
+           if x < "2020-02-01" and v[i] is not None]
+    pre_lo, pre_hi = min(pre), max(pre)
+    c_lo, c_hi = rng(b["covid"])
+    a_lo, a_hi = rng(b["ab2023"])
+    figure("abb_4_13", "4", "Hauptteil", "S1", "analytics.correlation",
+           "Rollierende Korrelation der digitalen Assets zum Aktienindex", fig,
+           f"Rollierendes {dei(c['window'])}-Tage-Fenster gegen "
+           f"{c['equity'].replace('_', ' ')}; jeder Punkt fasst die vorangegangenen "
+           f"{dei(c['window'])} Handelstage zusammen, der Anstieg setzt daher "
+           "verzögert zum Ereignis ein. Der Verlauf zeigt einen strukturellen Bruch: "
+           # Three decimals throughout: the pre-2020 mean of Bitcoin is -0.0016 and
+           # printed "-0,00" at two places, which reads as a typo in print.
+           f"vor Februar 2020 liegen die Mittelwerte zwischen {de(v_lo, 3)} und "
+           f"{de(v_hi, 3)}, im Mittel also nahe null — die Einzelwerte schwanken dabei "
+           f"zwischen {de(pre_lo, 2)} und {de(pre_hi, 2)}, ohne dauerhaft in eine "
+           "Richtung zu zeigen. Im markierten Fenster Februar bis Juni 2020 steigen sie auf "
+           f"{de(c_lo, 3)} bis {de(c_hi, 3)}, ab 2023 verharren sie bei {de(a_lo, 3)} "
+           f"bis {de(a_hi, 3)} und kehren damit NICHT auf das Ausgangsniveau zurück. "
+           "Für die Fragestellung ist das der zentrale Punkt: der "
+           "Diversifikationsbeitrag digitaler Assets ist keine Konstante, sondern "
+           "bricht genau dann ein, wenn er gebraucht würde — und er hat sich seither "
+           "nicht vollständig erholt.")
+
+
 BUILDERS = [tab_3_1, tab_3_2, tab_3_3, abb_3_1, abb_3_2, tab_3_4,
             tab_4_1, tab_4_2, tab_4_3, tab_4_4, tab_4_5, tab_4_6, tab_4_7, tab_4_8, tab_4_9,
             tab_4_10, tab_4_11, tab_4_12, abb_4_3, abb_4_4, abb_4_5, abb_4_7, abb_4_8,
-            abb_4_1, abb_4_2, abb_4_6, abb_4_9, abb_4_10, abb_4_11, abb_4_12,
+            abb_4_1, abb_4_2, abb_4_6, abb_4_9, abb_4_10, abb_4_11, abb_4_12, abb_4_13,
             tab_a_1]
 
 # Exhibits the archive cannot supply. Listed explicitly rather than silently skipped —

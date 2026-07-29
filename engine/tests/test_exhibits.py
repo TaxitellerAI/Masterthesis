@@ -212,6 +212,76 @@ def test_timeseries_and_rf_blocks_present():
           f"timeseries für drei Zielvolatilitäten in allen geprüften Records")
 
 
+def test_abb_4_13_lines_match_the_record():
+    """The rolling-correlation figure: read the DRAWN lines back out of the figure.
+
+    A figure cannot be parsed back like a CSV, so the builder's `figure()` call is
+    intercepted and the Matplotlib artists are inspected before the figure is closed.
+    That compares what was actually plotted against the record — not the builder's
+    input, which would be circular.
+    """
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+    import exhibits
+
+    captured = {}
+    real_figure = exhibits.figure
+
+    def spy(ident, chapter, placement, scenario, source, title, fig, caption=""):
+        captured["fig"] = fig
+        captured["caption"] = caption
+        real_figure(ident, chapter, placement, scenario, source, title, fig, caption)
+
+    exhibits.figure = spy
+    try:
+        exhibits.abb_4_13()
+    finally:
+        exhibits.figure = real_figure
+
+    c = _rec("S1")["analytics"]["correlation"]
+    d, S = c["dates"], c["series"]
+    ax = captured["fig"].axes[0]
+    drawn = {ln.get_label(): (list(ln.get_xdata()), list(ln.get_ydata()))
+             for ln in ax.get_lines() if ln.get_label() in S}
+    assert set(drawn) == set(S), f"Gezeichnet: {sorted(drawn)}, im Record: {sorted(S)}"
+
+    checked = 0
+    for asset, (xs, ys) in drawn.items():
+        v = S[asset]
+        expected_x = [i for i, y in enumerate(v) if y is not None]
+        assert xs == expected_x, f"{asset}: x-Positionen weichen ab"
+        assert len(ys) == len(expected_x), f"{asset}: {len(ys)} Punkte statt {len(expected_x)}"
+        # Three probes per series: first drawn point, the COVID-window maximum and
+        # the last point — start, extremum and end of each line.
+        covid = [i for i in expected_x if "2020-02-01" <= d[i] < "2020-07-01"]
+        peak = max(covid, key=lambda i: v[i])
+        for i in (expected_x[0], peak, expected_x[-1]):
+            got = ys[xs.index(i)]
+            assert abs(got - v[i]) < 1e-12, (
+                f"{asset} am {d[i]}: gezeichnet {got}, Record {v[i]}")
+            checked += 1
+    assert checked >= 3, checked
+
+    # The caption's block means must equal a fresh recomputation from the record.
+    def mean_of(lo, hi):
+        out = {}
+        for asset, v in S.items():
+            vals = [v[i] for i, x in enumerate(d) if lo <= x < hi and v[i] is not None]
+            out[asset] = sum(vals) / len(vals)
+        return min(out.values()), max(out.values())
+
+    cap = captured["caption"]
+    for lo, hi in (("2018-01-01", "2020-02-01"), ("2020-02-01", "2020-07-01"),
+                   ("2023-01-01", "2026-01-01")):
+        a_lo, a_hi = mean_of(lo, hi)
+        for value in (a_lo, a_hi):
+            assert exhibits.de(value, 3) in cap, (
+                f"Blockmittel {exhibits.de(value, 3)} ({lo}..{hi}) fehlt in der "
+                f"Beschriftung")
+            checked += 1
+    print(f"ok  abb_4_13: {checked} Werte — 12 Linienpunkte direkt aus der Figur "
+          f"zurückgelesen, 6 Blockmittel in der Beschriftung nachgerechnet")
+
+
 def test_reproducibility_table_covers_every_record():
     """tab_a_1 is the appendix's reproducibility proof — it must list every archived
     record, and every run hash in it must be unique.
@@ -300,6 +370,7 @@ if __name__ == "__main__":
     test_tab_4_9_rf_pair()
     test_tab_4_2_matches_crypto_share_records()
     test_timeseries_and_rf_blocks_present()
+    test_abb_4_13_lines_match_the_record()
     test_reproducibility_table_covers_every_record()
     test_every_file_carries_its_run_hash()
     test_register_matches_declared_gaps()

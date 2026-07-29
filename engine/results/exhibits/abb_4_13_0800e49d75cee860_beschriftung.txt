@@ -1,0 +1,5 @@
+abb_4_13: Rollierende Korrelation der digitalen Assets zum Aktienindex
+
+Rollierendes 90-Tage-Fenster gegen MSCI World; jeder Punkt fasst die vorangegangenen 90 Handelstage zusammen, der Anstieg setzt daher verzögert zum Ereignis ein. Der Verlauf zeigt einen strukturellen Bruch: vor Februar 2020 liegen die Mittelwerte zwischen -0,002 und 0,060, im Mittel also nahe null — die Einzelwerte schwanken dabei zwischen -0,28 und 0,36, ohne dauerhaft in eine Richtung zu zeigen. Im markierten Fenster Februar bis Juni 2020 steigen sie auf 0,442 bis 0,472, ab 2023 verharren sie bei 0,266 bis 0,355 und kehren damit NICHT auf das Ausgangsniveau zurück. Für die Fragestellung ist das der zentrale Punkt: der Diversifikationsbeitrag digitaler Assets ist keine Konstante, sondern bricht genau dann ein, wenn er gebraucht würde — und er hat sich seither nicht vollständig erholt.
+
+Szenario S1 · Lauf-Hash 0800e49d75cee860 · Quelle analytics.correlation
