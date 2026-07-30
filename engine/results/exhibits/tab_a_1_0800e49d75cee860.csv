@@ -2,15 +2,15 @@
 # Szenario alle · Lauf-Hash 0800e49d75cee860 · Quelle hashes + git + environment
 # Umgebung für alle Records: Python 3.14.4, numpy 2.5.0, pandas 3.0.3, scipy 1.18.0, statsmodels 0.14.6, Darwin 25.6.0 arm64. Der Datensatz-Hash bürgt für die Datenbasis allein, der Lauf-Hash zusätzlich für Fenster, Quelle, Zinsmodus und Gewichte. Beide sind auf 1e-12 quantisiert und damit plattformunabhängig.
 Record;Datensatz-Hash;Lauf-Hash;Commit;Erzeugt;Laufzeit
-S1;715caf81d0dd19d5;0800e49d75cee860;results-freeze-v2-1-gdcb68f1-dirty;2026-07-30T16:58:36+00:00;0,6 s
-S2;ebf5ba110371d633;1b58b85abc757380;results-freeze-v2-1-gdcb68f1-dirty;2026-07-30T16:58:37+00:00;0,7 s
-S3;f10f75b3cc68093b;bf7e43da9c3e41dd;results-freeze-v2-1-gdcb68f1-dirty;2026-07-30T16:58:38+00:00;0,5 s
-S4_2018;715caf81d0dd19d5;6922149ae914cad9;results-freeze-v2-1-gdcb68f1-dirty;2026-07-30T16:58:46+00:00;8,7 s
-S4_2019;393b9fff8c45e318;3a194ad53a9e4ee1;results-freeze-v2-1-gdcb68f1-dirty;2026-07-30T16:58:54+00:00;7,2 s
-S4_2020;4aaa25e937fa7322;78ddb5a119a61909;results-freeze-v2-1-gdcb68f1-dirty;2026-07-30T16:59:00+00:00;6,2 s
-S4_2021;43c7318e1fb4c7a6;2d3c4fe804d9ca54;results-freeze-v2-1-gdcb68f1-dirty;2026-07-30T16:59:05+00:00;5,2 s
-S4_2022;282cd7a47293c575;e1703345e9eab7b3;results-freeze-v2-1-gdcb68f1-dirty;2026-07-30T16:59:09+00:00;4,3 s
-S1_rf3;715caf81d0dd19d5;6489ea1e67c046fc;results-freeze-v2-1-gdcb68f1-dirty;2026-07-30T16:59:17+00:00;7,8 s
-S1_bh0;715caf81d0dd19d5;a00b7642adbe141d;results-freeze-v2-1-gdcb68f1-dirty;2026-07-30T16:59:18+00:00;0,6 s
-S1_bh25;715caf81d0dd19d5;df0ceee30992a7db;results-freeze-v2-1-gdcb68f1-dirty;2026-07-30T16:59:19+00:00;0,7 s
-S1_bh50;715caf81d0dd19d5;7f5a73de235c8986;results-freeze-v2-1-gdcb68f1-dirty;2026-07-30T16:59:19+00:00;0,6 s
+S1;715caf81d0dd19d5;0800e49d75cee860;results-freeze-v2-2-gad0f068;2026-07-30T17:01:51+00:00;0,7 s
+S2;ebf5ba110371d633;1b58b85abc757380;results-freeze-v2-2-gad0f068;2026-07-30T17:01:52+00:00;0,7 s
+S3;f10f75b3cc68093b;bf7e43da9c3e41dd;results-freeze-v2-2-gad0f068;2026-07-30T17:01:52+00:00;0,6 s
+S4_2018;715caf81d0dd19d5;6922149ae914cad9;results-freeze-v2-2-gad0f068;2026-07-30T17:02:01+00:00;8,6 s
+S4_2019;393b9fff8c45e318;3a194ad53a9e4ee1;results-freeze-v2-2-gad0f068;2026-07-30T17:02:08+00:00;7,2 s
+S4_2020;4aaa25e937fa7322;78ddb5a119a61909;results-freeze-v2-2-gad0f068;2026-07-30T17:02:15+00:00;6,2 s
+S4_2021;43c7318e1fb4c7a6;2d3c4fe804d9ca54;results-freeze-v2-2-gad0f068;2026-07-30T17:02:20+00:00;5,3 s
+S4_2022;282cd7a47293c575;e1703345e9eab7b3;results-freeze-v2-2-gad0f068;2026-07-30T17:02:24+00:00;4,3 s
+S1_rf3;715caf81d0dd19d5;6489ea1e67c046fc;results-freeze-v2-2-gad0f068;2026-07-30T17:02:32+00:00;7,8 s
+S1_bh0;715caf81d0dd19d5;a00b7642adbe141d;results-freeze-v2-2-gad0f068;2026-07-30T17:02:33+00:00;0,7 s
+S1_bh25;715caf81d0dd19d5;df0ceee30992a7db;results-freeze-v2-2-gad0f068;2026-07-30T17:02:33+00:00;0,7 s
+S1_bh50;715caf81d0dd19d5;7f5a73de235c8986;results-freeze-v2-2-gad0f068;2026-07-30T17:02:34+00:00;0,6 s

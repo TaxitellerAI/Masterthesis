@@ -7745,7 +7745,7 @@
   "kurtosis_convention": "excess",
   "source": "frozen",
   "base_currency": "EUR",
-  "fetched_at": "2026-07-30T16:58:37.412593+00:00",
+  "fetched_at": "2026-07-30T17:01:52.199197+00:00",
   "requested_window": {
    "start": "2018-01-01",
    "end": "2025-12-31"
@@ -30718,7 +30718,7 @@
   "run_hash": "1b58b85abc757380"
  },
  "runtime_seconds": 0.69,
- "generated_at": "2026-07-30T16:58:37+00:00",
+ "generated_at": "2026-07-30T17:01:52+00:00",
  "environment": {
   "python": "3.14.4",
   "platform": "Darwin 25.6.0 arm64",
@@ -30728,8 +30728,8 @@
   "statsmodels": "0.14.6"
  },
  "git": {
-  "commit": "dcb68f194fa1e26a4aba15eff8f42bf2f2fbbfd8",
-  "describe": "results-freeze-v2-1-gdcb68f1-dirty",
-  "dirty": true
+  "commit": "ad0f06805342ce91ac2609b0440d64add5e2aa13",
+  "describe": "results-freeze-v2-2-gad0f068",
+  "dirty": false
  }
 }
