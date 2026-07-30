@@ -1,0 +1,7 @@
+﻿# tab_4_13 — Investitionsgrad je Zielvolatilität
+# Szenario S1 · Lauf-Hash 0800e49d75cee860 · Quelle exposure_stats.by_target_vol
+"# Hebelgrenze 100 %, Schätzfenster 60 Handelstage, Anpassung des Investitionsgrades täglich, Totband 0,0 %. Berechnet auf der VOLLEN Tagesreihe des Investitionsgrades (2.010 Handelstage). Die Verlaufsgrafik abb_4_2 zeigt dieselbe Reihe wöchentlich abgetastet (402 Punkte) — für die Darstellung genügt das, für diese Kennzahlen nicht: Niveaugrößen überstehen die Abtastung (mittlerer Investitionsgrad und Standardabweichung stimmen auf drei Nachkommastellen überein), Änderungsgrößen nicht. Die mittlere Tagesveränderung fiele auf dem abgetasteten Pfad um 225 bis 267 % zu hoch aus, weil ein Schritt dort fünf Handelstage überspannt; der Anteil an der Hebelgrenze wiche bei 10 % Zielvolatilität um 0,8 Prozentpunkte ab (9,7 statt 10,5 %). Häufigkeit und Ausmaß der Anpassungen sind zu trennen: bei 5 % ändert sich der Investitionsgrad fast täglich, aber in kleinen Schritten; bei 15 % selten, weil er überwiegend an der Grenze liegt. Die stärkste Bewegung tritt dazwischen auf — daher der nicht-monotone Turnover."
+Zielvolatilität;Handelstage;Tage an der Hebelgrenze;Mittlerer Investitionsgrad;Standardabweichung;Mittlere Tagesveränderung;Tage mit Veränderung;Turnover gesamt;davon Exposure;davon Basisportfolio
+5 %;2.010;0,0 %;0,3587;0,1296;0,48 %;97,1 %;16,22;9,72;6,49
+10 %;2.010;10,5 %;0,7064;0,2416;0,81 %;87,6 %;29,03;16,23;12,80
+15 %;2.010;58,1 %;0,8789;0,2213;0,44 %;39,8 %;25,04;8,76;16,28

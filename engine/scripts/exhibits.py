@@ -918,9 +918,51 @@ def abb_4_13():
            "nicht vollständig erholt.")
 
 
+def tab_4_13():
+    """Investment ratio per target volatility — the mechanism behind 4.4.
+
+    Sourced from `exposure_stats`, which is computed on the FULL daily exposure path.
+    The `timeseries` block stores it weekly-sampled for charting; reading the share
+    at the cap off that path gives 59.7 % instead of 58.06 % — close enough to look
+    right, wrong enough to misstate a number the chapter argues with.
+    """
+    st = rec("S1")["exposure_stats"]
+    rows = []
+    for v in st["by_target_vol"].values():
+        rows.append([de(v["target_vol"], 0, True), dei(v["observations"]),
+                     de(v["share_at_cap"], 1, True), de(v["mean_exposure"], 4),
+                     de(v["sd_exposure"], 4), de(v["mean_abs_daily_change"], 2, True),
+                     de(v["share_days_changed"], 1, True),
+                     de(v["turnover_total"], 2), de(v["turnover_exposure"], 2),
+                     de(v["turnover_sleeve"], 2)])
+    table("tab_4_13", "4", "Hauptteil", "S1", "exposure_stats.by_target_vol",
+          "Investitionsgrad je Zielvolatilität",
+          ["Zielvolatilität", "Handelstage", "Tage an der Hebelgrenze",
+           "Mittlerer Investitionsgrad", "Standardabweichung",
+           "Mittlere Tagesveränderung", "Tage mit Veränderung",
+           "Turnover gesamt", "davon Exposure", "davon Basisportfolio"], rows,
+          f"Hebelgrenze {de(st['max_leverage'], 0, True)}, Schätzfenster "
+          f"{dei(st['lookback'])} Handelstage, Anpassung des Investitionsgrades "
+          f"{'täglich' if st['exposure_rebalance'] == 'daily' else st['exposure_rebalance']}, "
+          f"Totband {de(st['dead_band'], 1, True)}. Berechnet auf der VOLLEN Tagesreihe "
+          "des Investitionsgrades (2.010 Handelstage). Die Verlaufsgrafik abb_4_2 zeigt "
+          "dieselbe Reihe wöchentlich abgetastet (402 Punkte) — für die Darstellung "
+          "genügt das, für diese Kennzahlen nicht: Niveaugrößen überstehen die "
+          "Abtastung (mittlerer Investitionsgrad und Standardabweichung stimmen auf "
+          "drei Nachkommastellen überein), Änderungsgrößen nicht. Die mittlere "
+          "Tagesveränderung fiele auf dem abgetasteten Pfad um 225 bis 267 % zu hoch "
+          "aus, weil ein Schritt dort fünf Handelstage überspannt; der Anteil an der "
+          "Hebelgrenze wiche bei 10 % Zielvolatilität um 0,8 Prozentpunkte ab "
+          "(9,7 statt 10,5 %). "
+          "Häufigkeit und Ausmaß der Anpassungen sind zu trennen: bei 5 % ändert sich "
+          "der Investitionsgrad fast täglich, aber in kleinen Schritten; bei 15 % "
+          "selten, weil er überwiegend an der Grenze liegt. Die stärkste Bewegung "
+          "tritt dazwischen auf — daher der nicht-monotone Turnover.")
+
+
 BUILDERS = [tab_3_1, tab_3_2, tab_3_3, abb_3_1, abb_3_2, tab_3_4,
             tab_4_1, tab_4_2, tab_4_3, tab_4_4, tab_4_5, tab_4_6, tab_4_7, tab_4_8, tab_4_9,
-            tab_4_10, tab_4_11, tab_4_12, abb_4_3, abb_4_4, abb_4_5, abb_4_7, abb_4_8,
+            tab_4_10, tab_4_11, tab_4_12, tab_4_13, abb_4_3, abb_4_4, abb_4_5, abb_4_7, abb_4_8,
             abb_4_1, abb_4_2, abb_4_6, abb_4_9, abb_4_10, abb_4_11, abb_4_12, abb_4_13,
             tab_a_1]
 

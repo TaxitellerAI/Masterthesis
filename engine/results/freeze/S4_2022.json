@@ -1156,7 +1156,7 @@
      0.134677
     ]
    },
-   "runtime_seconds": 3.57,
+   "runtime_seconds": 3.44,
    "sample": {
     "scenario": "S4_2022",
     "label": "Startjahr 2022 (Sensitivität)",
@@ -7986,7 +7986,7 @@
   "kurtosis_convention": "excess",
   "source": "frozen",
   "base_currency": "EUR",
-  "fetched_at": "2026-07-27T19:48:00.065138+00:00",
+  "fetched_at": "2026-07-30T16:59:09.851967+00:00",
   "requested_window": {
    "start": "2018-01-01",
    "end": "2025-12-31"
@@ -29785,12 +29785,57 @@
   "convention": "Tagessatz x 252 Handelstage",
   "mode": "estr_chained"
  },
+ "exposure_stats": {
+  "max_leverage": 1.0,
+  "exposure_rebalance": "daily",
+  "dead_band": 0.0,
+  "lookback": 60,
+  "note": "Volle Tagesreihe des Investitionsgrades, nicht die woechentlich abgetastete Fassung aus dem timeseries-Block.",
+  "by_target_vol": {
+   "vol_5": {
+    "target_vol": 0.05,
+    "observations": 1002,
+    "share_at_cap": 0.0,
+    "mean_exposure": 0.34612077154202203,
+    "sd_exposure": 0.13209853694498505,
+    "mean_abs_daily_change": 0.004528131699292293,
+    "share_days_changed": 0.9410589410589411,
+    "turnover_total": 7.138029932092151,
+    "turnover_exposure": 4.532659830991586,
+    "turnover_sleeve": 2.605370101100565
+   },
+   "vol_10": {
+    "target_vol": 0.1,
+    "observations": 1002,
+    "share_at_cap": 0.07584830339321358,
+    "mean_exposure": 0.690035577564173,
+    "sd_exposure": 0.26139181755489804,
+    "mean_abs_daily_change": 0.00808602505716626,
+    "share_days_changed": 0.8781218781218781,
+    "turnover_total": 13.285569914336145,
+    "turnover_exposure": 8.094111082223426,
+    "turnover_sleeve": 5.191458832112719
+   },
+   "vol_15": {
+    "target_vol": 0.15,
+    "observations": 1002,
+    "share_at_cap": 0.592814371257485,
+    "mean_exposure": 0.8562692733351465,
+    "sd_exposure": 0.2555278224365152,
+    "mean_abs_daily_change": 0.004110983486938959,
+    "share_days_changed": 0.35564435564435565,
+    "turnover_total": 10.658102909175703,
+    "turnover_exposure": 4.115094470425898,
+    "turnover_sleeve": 6.543008438749804
+   }
+  }
+ },
  "hashes": {
   "dataset_hash": "282cd7a47293c575",
   "run_hash": "e1703345e9eab7b3"
  },
- "runtime_seconds": 4.46,
- "generated_at": "2026-07-27T19:48:00+00:00",
+ "runtime_seconds": 4.33,
+ "generated_at": "2026-07-30T16:59:09+00:00",
  "environment": {
   "python": "3.14.4",
   "platform": "Darwin 25.6.0 arm64",
@@ -29800,8 +29845,8 @@
   "statsmodels": "0.14.6"
  },
  "git": {
-  "commit": "9e9bd35134b4a980350496e654dcb743d8e8f926",
-  "describe": "results-freeze-v1-5-g9e9bd35",
-  "dirty": false
+  "commit": "dcb68f194fa1e26a4aba15eff8f42bf2f2fbbfd8",
+  "describe": "results-freeze-v2-1-gdcb68f1-dirty",
+  "dirty": true
  }
 }

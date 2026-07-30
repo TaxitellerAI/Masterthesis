@@ -212,6 +212,72 @@ def test_timeseries_and_rf_blocks_present():
           f"timeseries für drei Zielvolatilitäten in allen geprüften Records")
 
 
+def test_tab_4_13_matches_exposure_stats():
+    """Investment-ratio table — chapter 4.4 argues with every one of these numbers."""
+    header, rows, run_hash = _read("tab_4_13")
+    r = _rec("S1")
+    assert run_hash == r["hashes"]["run_hash"]
+    st = r["exposure_stats"]["by_target_vol"]
+    assert len(rows) == len(st) == 3, f"{len(rows)} Zeilen, {len(st)} Zielvolatilitäten"
+    assert header[:4] == ["Zielvolatilität", "Handelstage", "Tage an der Hebelgrenze",
+                          "Mittlerer Investitionsgrad"], header
+    checked = 0
+    for row, v in zip(rows, st.values()):
+        assert abs(num(row[0]) - v["target_vol"]) < 1e-9, f"Zielvol {row[0]}"
+        assert num(row[1]) == v["observations"], "Handelstage"
+        for idx, key, tol in ((2, "share_at_cap", 5e-4), (3, "mean_exposure", 5e-5),
+                              (4, "sd_exposure", 5e-5),
+                              (5, "mean_abs_daily_change", 5e-5),
+                              (6, "share_days_changed", 5e-4),
+                              (7, "turnover_total", 5e-3),
+                              (8, "turnover_exposure", 5e-3),
+                              (9, "turnover_sleeve", 5e-3)):
+            got, want = num(row[idx]), v[key]
+            assert abs(got - want) < tol, f"{row[0]}.{key}: Exhibit {got} vs Archiv {want}"
+            checked += 1
+        checked += 2
+    # The mechanism the chapter describes must be in the data, not only in the prose.
+    caps = [v["share_at_cap"] for v in st.values()]
+    assert caps[0] < caps[1] < caps[2], f"Anteil an der Hebelgrenze nicht monoton: {caps}"
+    chg = [v["mean_abs_daily_change"] for v in st.values()]
+    assert chg[1] > chg[0] and chg[1] > chg[2], f"Bewegung nicht in der Mitte maximal: {chg}"
+    print(f"ok  tab_4_13: {checked} Werte identisch zum Archiv; Cap-Anteil monoton "
+          f"({', '.join(f'{c:.1%}' for c in caps)}), Bewegung in der Mitte maximal")
+
+
+def test_exposure_stats_use_the_daily_series():
+    """The whole reason exposure_stats exists: the weekly-sampled charting path gives
+    a materially different share at the cap. If the two ever agreed, the block would
+    be redundant — and if the table silently switched to the sampled path, this
+    catches it."""
+    r = _rec("S1")
+    worst = 0.0
+    for key, v in r["exposure_stats"]["by_target_vol"].items():
+        ts = r["timeseries"][key]
+        e = ts["series"][ts["selected"]]["exposure"]
+        assert v["observations"] > len(e), (
+            f"{key}: Tagesreihe ({v['observations']}) nicht länger als der "
+            f"abgetastete Pfad ({len(e)})")
+        d = [abs(e[i] - e[i - 1]) for i in range(1, len(e))]
+        sampled = sum(d) / len(d)
+        rel = abs(sampled - v["mean_abs_daily_change"]) / v["mean_abs_daily_change"]
+        worst = max(worst, rel)
+        # A step on the weekly path spans five trading days, so this statistic cannot
+        # survive the sampling — that is precisely why exposure_stats exists.
+        assert rel > 1.0, (
+            f"{key}: mittlere Tagesveränderung täglich "
+            f"{v['mean_abs_daily_change']:.4f} vs abgetastet {sampled:.4f} — nur "
+            f"{rel:.0%} Abweichung, dann bräuchte es den eigenen Block nicht")
+        # Level statistics DO survive it; asserting that keeps the caption honest.
+        lvl = sum(e) / len(e)
+        assert abs(lvl - v["mean_exposure"]) < 5e-4, (
+            f"{key}: mittlerer Investitionsgrad weicht ab ({lvl:.4f} vs "
+            f"{v['mean_exposure']:.4f}) — die Beschriftung behauptet das Gegenteil")
+    print(f"ok  Änderungsgrößen überstehen die wöchentliche Abtastung NICHT "
+          f"(bis {worst:.0%} Abweichung), Niveaugrößen schon (< 5e-04) — "
+          f"der eigene Block ist begründet")
+
+
 def test_abb_4_13_lines_match_the_record():
     """The rolling-correlation figure: read the DRAWN lines back out of the figure.
 
@@ -370,6 +436,8 @@ if __name__ == "__main__":
     test_tab_4_9_rf_pair()
     test_tab_4_2_matches_crypto_share_records()
     test_timeseries_and_rf_blocks_present()
+    test_tab_4_13_matches_exposure_stats()
+    test_exposure_stats_use_the_daily_series()
     test_abb_4_13_lines_match_the_record()
     test_reproducibility_table_covers_every_record()
     test_every_file_carries_its_run_hash()

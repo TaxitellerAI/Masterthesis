@@ -116,6 +116,7 @@ def compute(name: str, overrides: dict) -> dict:
         # The rf summary in describe() carries statistics, not the path. The path is
         # what an appendix chart of the chained series needs.
         "rf_series": _rf_series(req),
+        "exposure_stats": _exposure_stats(req),
     }
     fp = bt.get("fingerprint", {})
     rec["hashes"] = {"dataset_hash": fp.get("dataset_hash"),
@@ -149,6 +150,50 @@ def _rf_series(req) -> dict:
             "annualised": [round(float(v) * td, 12) for v in ser.to_numpy()],
             "convention": f"Tagessatz x {td} Handelstage",
             "mode": req.rf_mode}
+
+
+def _exposure_stats(req) -> dict:
+    """Investment-ratio statistics from the FULL daily exposure path.
+
+    `timeseries` stores the path weekly-sampled for charting, which is fine for a
+    figure but wrong for a statistic: the share of days at the leverage cap comes out
+    as 59.7 % instead of 58.1 % on the sampled path. Chapter 4.4 argues with these
+    numbers, so they are computed here on the daily series and archived — otherwise
+    the text would rest on an ad-hoc calculation nobody can reproduce.
+    """
+    import numpy as np
+    import pandas as pd
+    from api.main import _prepared, RunRequest
+    from volcontrol import run_strategies
+    rets, cfg, _rf, _spec, _rep, pit = _prepared(req)
+    run = run_strategies(rets, cfg, req.crypto_share, pit_builder=pit)
+    out = {"max_leverage": float(cfg.max_leverage),
+           "exposure_rebalance": cfg.rebalance,
+           "dead_band": float(cfg.dead_band),
+           "lookback": int(cfg.lookback),
+           "note": "Volle Tagesreihe des Investitionsgrades, nicht die woechentlich "
+                   "abgetastete Fassung aus dem timeseries-Block.",
+           "by_target_vol": {}}
+    for tv in cfg.target_vols:
+        key = f"VolControl_{int(tv * 100)}"
+        s = run["strategies"].get(key)
+        if s is None:
+            continue
+        e = pd.Series(s["exposure"], dtype=float)
+        d = e.diff().abs().dropna()
+        out["by_target_vol"][f"vol_{int(tv * 100)}"] = {
+            "target_vol": float(tv),
+            "observations": int(len(e)),
+            "share_at_cap": float((e >= cfg.max_leverage - 1e-9).mean()),
+            "mean_exposure": float(e.mean()),
+            "sd_exposure": float(e.std(ddof=1)),
+            "mean_abs_daily_change": float(d.mean()),
+            "share_days_changed": float((d > 1e-12).mean()),
+            "turnover_total": float(s["turnover"]),
+            "turnover_exposure": float(s["turnover_exposure"]),
+            "turnover_sleeve": float(s["turnover_sleeve"]),
+        }
+    return out
 
 
 def _json_default(o):

@@ -8248,7 +8248,7 @@
   "kurtosis_convention": "excess",
   "source": "frozen",
   "base_currency": "EUR",
-  "fetched_at": "2026-07-27T19:47:28.410309+00:00",
+  "fetched_at": "2026-07-30T16:58:38.005040+00:00",
   "requested_window": {
    "start": "2018-01-01",
    "end": "2025-12-31"
@@ -27877,12 +27877,57 @@
   "convention": "Tagessatz x 252 Handelstage",
   "mode": "estr_chained"
  },
+ "exposure_stats": {
+  "max_leverage": 1.0,
+  "exposure_rebalance": "daily",
+  "dead_band": 0.0,
+  "lookback": 60,
+  "note": "Volle Tagesreihe des Investitionsgrades, nicht die woechentlich abgetastete Fassung aus dem timeseries-Block.",
+  "by_target_vol": {
+   "vol_5": {
+    "target_vol": 0.05,
+    "observations": 1254,
+    "share_at_cap": 0.0,
+    "mean_exposure": 0.3395464370262407,
+    "sd_exposure": 0.11964084717117775,
+    "mean_abs_daily_change": 0.004333243739590069,
+    "share_days_changed": 0.9529130087789306,
+    "turnover_total": 9.128767064485817,
+    "turnover_exposure": 5.429554405706357,
+    "turnover_sleeve": 3.6992126587794605
+   },
+   "vol_10": {
+    "target_vol": 0.1,
+    "observations": 1254,
+    "share_at_cap": 0.014354066985645933,
+    "mean_exposure": 0.6787988076203164,
+    "sd_exposure": 0.2388674294857682,
+    "mean_abs_daily_change": 0.008486717575918125,
+    "share_days_changed": 0.942537909018356,
+    "turnover_total": 18.028596504811546,
+    "turnover_exposure": 10.633857122625411,
+    "turnover_sleeve": 7.394739382186133
+   },
+   "vol_15": {
+    "target_vol": 0.15,
+    "observations": 1254,
+    "share_at_cap": 0.5669856459330144,
+    "mean_exposure": 0.8629328378984308,
+    "sd_exposure": 0.23875694226846944,
+    "mean_abs_daily_change": 0.003932236793927953,
+    "share_days_changed": 0.39185953711093374,
+    "turnover_total": 14.456331145638906,
+    "turnover_exposure": 4.927092702791725,
+    "turnover_sleeve": 9.52923844284718
+   }
+  }
+ },
  "hashes": {
   "dataset_hash": "f10f75b3cc68093b",
   "run_hash": "bf7e43da9c3e41dd"
  },
- "runtime_seconds": 0.52,
- "generated_at": "2026-07-27T19:47:28+00:00",
+ "runtime_seconds": 0.54,
+ "generated_at": "2026-07-30T16:58:38+00:00",
  "environment": {
   "python": "3.14.4",
   "platform": "Darwin 25.6.0 arm64",
@@ -27892,8 +27937,8 @@
   "statsmodels": "0.14.6"
  },
  "git": {
-  "commit": "9e9bd35134b4a980350496e654dcb743d8e8f926",
-  "describe": "results-freeze-v1-5-g9e9bd35",
-  "dirty": false
+  "commit": "dcb68f194fa1e26a4aba15eff8f42bf2f2fbbfd8",
+  "describe": "results-freeze-v2-1-gdcb68f1-dirty",
+  "dirty": true
  }
 }

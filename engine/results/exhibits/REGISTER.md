@@ -1,6 +1,6 @@
 # Exhibit-Register
 
-Erzeugt aus dem Freeze-Archiv (Tag `results-freeze-v1`). 32 Exhibits, 0 offene Lücken.
+Erzeugt aus dem Freeze-Archiv (Tag `results-freeze-v1`). 33 Exhibits, 0 offene Lücken.
 
 Die Spalte **Platzierung** ist ein Vorschlag und in REGISTER.csv leicht änderbar; sie beeinflusst die Erzeugung nicht.
 
@@ -29,6 +29,7 @@ Die Spalte **Platzierung** ist ein Vorschlag und in REGISTER.csv leicht änderba
 | `tab_4_10` | Tabelle | 4 | Anhang | S1 | `robustness.walk_forward` | `0800e49d75cee860` | Walk-Forward: Folds und Out-of-Sample-Ergebnis |
 | `tab_4_11` | Tabelle | 4 | Hauptteil | S1 | `robustness.subperiods` | `0800e49d75cee860` | Ergebnisse nach Marktregime |
 | `tab_4_12` | Tabelle | 4 | Anhang | S1 | `analytics.drawdowns` | `0800e49d75cee860` | Die 5 tiefsten Drawdown-Episoden |
+| `tab_4_13` | Tabelle | 4 | Hauptteil | S1 | `exposure_stats.by_target_vol` | `0800e49d75cee860` | Investitionsgrad je Zielvolatilität |
 | `tab_4_2` | Tabelle | 4 | Hauptteil | S1_bh0/S1/S1_bh25/S1_bh50 | `backtest.metrics[BuyHold]` | `0800e49d75cee860` | Teilfrage 1: Risiko-Rendite-Profil des STATISCHEN Portfolios je Krypto-Quote |
 | `tab_4_3` | Tabelle | 4 | Anhang | S1 | `backtest.metrics (turnover*)` | `0800e49d75cee860` | Zerlegung des Turnovers |
 | `tab_4_4` | Tabelle | 4 | Hauptteil | S1 | `hypotheses.H1/H2 + holm_adjusted` | `0800e49d75cee860` | Konfirmatorische Hypothesentests H1 und H2 |
